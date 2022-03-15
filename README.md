@@ -20,6 +20,7 @@ Dept. of Statistic, Applied Math. and Computing, Universidade Estadual Paulista 
 ## Visão Geral
 O <strong>pyUDLF</strong> atua como um wrapper em Python para o UDLF que está em C/C++.
 Dessa forma, todas as chamadas são feitas como se o UDLF estivesse em Python, mas na verdade o pyUDLF faz as chamadas pelo binário da versão original. Caso o usuário não possua o binário, o pyUDLF irá baixa-lo, bem como o arquivo de configuração.
+
 ----------------------
 ## Como instalar
 python setup.py install (ver como escrever)

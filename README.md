@@ -99,7 +99,7 @@ print(results["Time"])
 
 ----------------------
 ## Exemplos
-Exemplo mais detalhados, com outras formar de definição/configuração e execução se encontram na [pagina de exemplos](https://bitbucket.org/bisteka/pyudlf/wiki/Exemplos)
+Exemplo mais detalhados, com outras formar de definição/configuração e execução se encontram na [pagina de exemplos](https://github.com/UDLF/pyUDLF/wiki/Examples)
 
 ----------------------
 ## Documentação
@@ -108,7 +108,7 @@ Funcionamento mais alto nível do PyUDLF:
 
 ![BasicPyUDLF.png](https://bitbucket.org/repo/Lbo4LXb/images/2442401143-BasicPyUDLF.png)
 
-A documentação das funções se encontra disponível na [pagina de documentação](https://bitbucket.org/bisteka/pyudlf/wiki/Documentata%C3%A7%C3%A3o)
+A documentação das funções se encontra disponível na [pagina de documentação](https://github.com/UDLF/pyUDLF/wiki/Documentation)
 
 ----------------------
 ## Contribuição

@@ -106,7 +106,7 @@ Exemplo mais detalhados, com outras formar de definição/configuração e execu
 
 Funcionamento mais alto nível do PyUDLF:
 
-![BasicPyUDLF](https://user-images.githubusercontent.com/69856485/161095523-04884b25-b94c-416b-8413-4b91e6d38332.png)
+![Basic![basic2](https://user-images.githubusercontent.com/69856485/161096018-417ba18b-b8a2-40df-b5c5-bf16c076edb8.png)
 
 A documentação das funções se encontra disponível na [pagina de documentação](https://github.com/UDLF/pyUDLF/wiki/Documentation)
 

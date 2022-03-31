@@ -129,8 +129,4 @@ TESTE
 
 ----------------------
 ## licença
-TESTE
-
-[input](https://bitbucket.org/bisteka/pyudlf/wiki/InputType%20Functions)
-https://github.com/UDLF/UDLF
-https://github.com/UDLF/UDLF#binaries
+[link](https://github.com/UDLF/pyUDLF/blob/main/LICENSE)

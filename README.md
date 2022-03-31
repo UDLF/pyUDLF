@@ -113,7 +113,7 @@ A documentação das funções se encontra disponível na [pagina de documentaç
 ----------------------
 ## Contribuição
 Agradecemos sugestões, ideias e contribuições.
-Se você quiser contribuir, sinta-se à vontade para entrar em [contato] conosco.
+Se você quiser contribuir, sinta-se à vontade para entrar em [contato](#contato)conosco.
 
 ----------------------
 ## Contato

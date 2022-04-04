@@ -5,71 +5,72 @@
 Dept. of Statistic, Applied Math. and Computing, Universidade Estadual Paulista ([UNESP](http://www.rc.unesp.br/)), Rio Claro, Brazil
 
 ----------------------
-* [Visão Geral](#visão-geral)
-* [Como instalar](#como-instalar)
-* [Primeiros passos](#primeiros-passos)
-* [Exemplo de execução](#exemplo-de-execução)
-* [Exemplos](#exemplos)
-* [Documentação](#documentação)
-* [Contribuição](#contribuição)
-* [Aplicações](#Aplicações)
-* [Contato](#contato)
-* [Agradecimentos](#agradecimentos)
-* [Licença](#Licença)
+* [Overview](#overview)
+* [How to install](#how-to-install)
+* [First Steps](#first-steps)
+* [Execution example](#execution-example)
+* [Examples](#examples)
+* [Documentation](#documentation)
+* [Contribution](#contribution)
+* [Applications](#applications)
+* [Contact](#contact)
+* [Acknowledgments](#acknowledgments)
+* [License](#license)
 ----------------------
-## Visão Geral
-O <strong>pyUDLF</strong> atua como um wrapper em Python para o UDLF que está em C/C++.
-Dessa forma, todas as chamadas são feitas como se o UDLF estivesse em Python, mas na verdade o pyUDLF faz as chamadas pelo binário da versão original. Caso o usuário não possua o binário, o pyUDLF irá baixa-lo, bem como o arquivo de configuração.
+## Overview
+The <strong>pyUDLF</strong> acts as a Python wrapper for the UDLF that is in C/C++.
+This way, all the calls are made as if the UDLF is in Python, but pyUDLF actually calls from the binary of the original version. If the user does not have the binary, pyUDLF will download it and the configuration file.
 
 ----------------------
-## Como instalar
+## How to install
 python setup.py install (ver como escrever)
 
-## Primeiros passos
-1) Caminhos
+----------------------
+## First Steps
+1) Paths
 
-O usuário é capaz de definir o caminho para o binário e o config do UDLF, caso não seja definido, o pyUDLF possui o caminho do usuário como padrão. **Note que, se os arquivos não existirem nos caminhos definidos, eles serão baixados**.
+The user is able to define the path to the UDLF binary and config, if not defined, pyUDLF defaults to the user path. **Note that if the files do not exist in the defined paths, they will be downloaded.**
 
-2) Configuração
+2) Configuration
 
-Após a configuração dos caminhos, o usuário é capaz de configurar o arquivo de configuração do UDLF, como por exemplo, atribuir ou receber valores, listar todos os parâmetros e valores, entre outras funcionalidades, tudo através do pyUDLF, sem a necessidade de alteração manual do config. Um exemplo de vantagem adquirida com essa funcionalidade seria uma execução com o resultado obtido de uma outra execução ou sucessivas execuções...
-**É importante ressaltar que, o objeto input vira com os parâmetros e valores que estão definidos no config do caminho fornecido !** 
+After configuring the paths, the user is able to configure the UDLF configuration file, such as assigning or receiving values, listing all parameters and values, among other features, all through pyUDLF, without the need to manually change the config. An example of an advantage gained with this functionality would be a run with the result obtained from another run, or successive runs...
+**It is important to note that the input object comes with the parameters and values that are defined in the config for the given path!**
 
-3) Execução
+3) Execution
 
-É possível executar o pyUDLF de 3 maneiras, sao elas:
+You can run pyUDLF in three ways:
 
-+ **Arquivo config disponibilizado**: executa o UDLF com alguma config fornecida.
-+ **Arquivo config nao disponibilizado**: através de um objeto "input", pode-se configurar a vontade e executar, sem a necessidade de ter o arquivo config salvo na máquina.
-+ **Retornos**: As duas maneiras anteriores mas com retornos, ou seja, o log de resultados em um dicionário e a lista ranqueada ou matrix de retorno
++ **Available config file**: runs the UDLF with some provided config.
++ **Unavailable config file**: through an "input" object, you can configure at will and execute, without the need to have the config file saved on the machine.
++ **Returns**: The previous two ways but with returns, i.e. the result log in a dictionary and the ranked list or return matrix.
 
-4) Retornos
+4) Returns
 
-Por conclusão, o pyUDLF e realiza uma execução, conforme especificada.
-Nos casos que o resultado da operação é solicitado, é retornado um dicionário, com as saídas especificadas no config.
+On completion, pyUDLF and performs an execution as specified.
+In cases where the result of the operation is requested, a dictionary is returned, with the outputs specified in the config.
 
 
-Estes 4 passos estão exemplificados no tópico seguinte, onde está disponibilizado um exemplo de execução de maneira simples. Lembrando que, existe mais de uma maneira de definição, configuração e execução.
+These 4 steps are exemplified in the following topic, where a simple execution example is provided. Remember that there is more than one way to define, configure and execute.
 
 ----------------------
-## Exemplo de execução
+## Execution example
 
-Este exemplo é simples, apenas para mostrar uma maneira de execução. Exemplos mais complexos ou de diferentes maneiras de executar encontram-se no tópico [Exemplos](#exemplos).
-Note que, o exemplo teve os caminhos setados, alguns parâmetros alterados e o retorno foi solicitado.
+This example is simple, just to show one way of execution. More complex examples or different ways of execution are in [Examples](#Examples).
+Note that the example had the paths set, some parameters changed and the return was requested.
 
 ```python
 from pyUDLF import run_calls as udlf
 from pyUDLF import inputType
 
-# Setando o caminho do binário e do config (1)
+# Setting the binary and config path (1)
 udlf.setBinaryPath("/home/usr/Desktop/UDLF/UDLF/bin/udlf")
 udlf.setConfigPath = ("/home/usr/Desktop/UDLF/UDLF/bin/minha_config.ini")
 
-# Definindo o objeto input, com o nome de input_data (2)
+# Defining the input object, named input_data (2)
 input_data = inputType.InputType()
 
-# Alterando valores do config. (2)
-#parametros mais usados
+# Changing config values. (2)
+#most used parameters
 #set_*param_name*(param_value)
 files_path = "../Soccer/matrices/distance/acc.txt"
 classes_path = "/home/gustavo/Desktop/UDLF/UDLF/Soccer/classes.txt"
@@ -79,16 +80,16 @@ input_data.set_lists_file(".../Soccer/lists.txt")    #Path of the lists file
 input_data.set_classes_file(classes_path)   #Path of the classes file
 ...
 
-#parâmetro genérico
+#generic parameter
 #set_param("param_name", param_value) 
 input_data.set_param("UDL_TASK", "UDL")     #(UDL|FUSION): Selection of task to be executed
 input_data.set_param("PARAM_NONE_L", 1400)  #(TUint): Size of the ranked list (must be lesser than SIZE_DATASET)
 ...
 
-# Executando (3)
+# Running (3)
 output = udlf.run(input_data, get_output = True)
 
-# Resultado
+# Result
 output.print_log()
 results = output.get_log()
 print(results["MAP"]["After"]) # or ["Before"] or ["Gain"]
@@ -98,25 +99,30 @@ print(results["Time"])
 ```
 
 ----------------------
-## Exemplos
-Exemplo mais detalhados, com outras formar de definição/configuração e execução se encontram na [pagina de exemplos](https://github.com/UDLF/pyUDLF/wiki/Examples)
+## Examples
+More detailed examples, with further definition/configuration and execution forms, can be found on the [examples page](https://github.com/UDLF/pyUDLF/wiki/Examples).
 
 ----------------------
-## Documentação
+## Documentation
 
-Funcionamento mais alto nível do PyUDLF:
+Highest level operation of PyUDLF:
 
 ![basic2](https://user-images.githubusercontent.com/69856485/161096018-417ba18b-b8a2-40df-b5c5-bf16c076edb8.png)
 
-A documentação das funções se encontra disponível na [pagina de documentação](https://github.com/UDLF/pyUDLF/wiki/Documentation)
+Documentation for the functions is available at [documentation page](https://github.com/UDLF/pyUDLF/wiki/Documentation)
 
 ----------------------
-## Contribuição
-Agradecemos sugestões, ideias e contribuições.
-Se você quiser contribuir, sinta-se à vontade para entrar em [contato](#contato) conosco.
+## Contribution
+We welcome suggestions, ideas, and contributions.
+If you would like to contribute, feel free to [Contact](#Contact) us.
 
 ----------------------
-## Contato
+## Applications
+
+aplications
+
+----------------------
+## Contact
 **Gustavo Rosseto Leticio**: `gustavo.leticio@gmail.com` ou `gustavo.leticio@unesp.br`
 
 **Lucas Pascotti Valem**: `lucaspascottivalem@gmail.com` ou `lucas.valem@unesp.br`
@@ -124,9 +130,9 @@ Se você quiser contribuir, sinta-se à vontade para entrar em [contato](#contat
 **Daniel Carlos Guimarães Pedronette**: `daniel.pedronette@unesp.br`
 
 ----------------------
-## Agradecimentos
+## Acknowledgments
 TESTE
 
 ----------------------
-## licença
+## License
 [link](https://github.com/UDLF/pyUDLF/blob/main/LICENSE)

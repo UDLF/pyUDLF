@@ -119,7 +119,8 @@ def verify_bin(config_path, bin_path):
         file.extractall(pyudlf_dir)
         file.close()
     else:
-        print("UDLF binary files found succesfully!")
+        pass
+        #print("UDLF binary files found succesfully!")
 
 
 def run_platform(config_file, bin_path):
@@ -179,7 +180,7 @@ def runWithConfig(config_file=None, get_output=False):
     if run_platform(config_file, bin_path):
         print("Could not run")
         return
-    print("Successful execution...")
+    #print("Successful execution...")
 
     if (get_output is True):
         with open(config_file, 'r') as f:
@@ -230,3 +231,114 @@ def run(input_type, get_output=False):
     output = runWithConfig(input_path, get_output)
     return output
     # config_path = inputType.get_generatedConfig()?
+
+
+def find_best(input_type, ranked_list_size=0):
+    """
+    """
+    global config_path, bin_path
+
+    # setando o tamanho da ranked list de todo methodo
+    if(ranked_list_size != 0):
+        input_type.set_ranked_lists_size(ranked_list_size)
+
+    # pegando todos os metodos disponiveis
+    methods = input_type.get_method_name()
+    methods = methods[1].split(":")
+    methods = methods[0].split("(")
+    methods = methods[1].split(")")
+    methods = methods[0].split("|")
+
+    # pegando os parametros
+    # antes de pegar, testar se esta computando
+
+    precision_param = input_type.get_param(
+        "EFFECTIVENESS_PRECISIONS_TO_COMPUTE")
+    recall_param = input_type.get_param("EFFECTIVENESS_RECALLS_TO_COMPUTE")
+
+    precision_param = precision_param[0].strip().split(",")
+    recall_param = recall_param[0].strip().split(",")
+
+    for i in range(len(precision_param)):
+        precision_param[i] = "P@"+precision_param[i].strip()
+    for i in range(len(recall_param)):
+        recall_param[i] = "Recall@"+recall_param[i].strip()
+
+    # criando o dicionario
+    best_dict = dict()
+
+    # Verificando quais valores computar
+    r_values = True
+    p_values = True
+    map_values = True
+
+    r_values = input_type.get_param("EFFECTIVENESS_COMPUTE_RECALL")
+    p_values = input_type.get_param("EFFECTIVENESS_COMPUTE_PRECISIONS")
+    map_values = input_type.get_param("EFFECTIVENESS_COMPUTE_MAP")
+
+    r_values = r_values[0].strip()
+    p_values = p_values[0].strip()
+    map_values = map_values[0].strip()
+
+    # adicionando chaves com valores vazias ao dicionario
+    #new_value = [(0, "TEST"), (0, "TEST")]
+
+    # adicionar chaves de recall
+    if(r_values):
+        for param in recall_param:
+            best_dict[param] = []
+
+    # adicionar chaves precision
+    if(p_values):
+        for param in precision_param:
+            best_dict[param] = []
+
+    # adicionar chave map
+    if(map_values):
+        best_dict["MAP"] = []
+
+    # salvando methodo antigo
+    # corrigir pq get_method ta trazendo tudo, precisa tirar o split
+    old_method = input_type.get_method_name()[0].strip()
+
+    # iterando sobre cada methodo.
+    # methodo NONE nao contabiliza
+
+    # methodos para corrigir!!!!
+    # rlsim e RDPAC
+
+    for method in methods[1:]:
+        if (method != "RDPAC") and (method != "RLSIM"):
+            input_type.set_method_name(method)
+            print(method)
+
+            output = run(input_type, get_output=True)
+            output_values = output.get_log()
+
+            if(r_values):
+                for param in recall_param:
+                    rv = output_values[param]['After']
+                    best_dict[param].append((rv, method))
+                    # pegar o recall
+
+                    # adicionar chaves precision
+            if(p_values):
+                for param in precision_param:
+                    pv = output_values[param]['After']
+                    best_dict[param].append((pv, method))
+
+                # adicionar chave map
+            if(map_values):
+                # print(output_values['MAP']['After'])
+                value = output_values['MAP']['After']
+                best_dict['MAP'].append((value, method))
+    #best_dict['MAP'] = sorted(best_dict['MAP'], reverse=True)
+
+    for param in best_dict:
+        best_dict[param] = sorted(best_dict[param], reverse=True)
+
+    # print(best_dict['MAP'])
+    # print(best_dict['Recall@4'])
+    return best_dict
+
+# metodo rdpac e rlsim nao estao sendo contabilizados

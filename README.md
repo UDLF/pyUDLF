@@ -100,7 +100,16 @@ print(results["Time"])
 
 ----------------------
 ## Examples
-More detailed examples, with further definition/configuration and execution forms, can be found on the [examples page](https://github.com/UDLF/pyUDLF/wiki/Examples).
+More detailed examples, with further definition/configuration and execution forms, can be found on the [examples page](https://github.com/UDLF/pyUDLF/wiki/Examples). On this page you will be shown a basic step by step how to do it, not being the only way to do it, just one of them, and finally more examples, as follows: 
+
+* [How To](https://github.com/UDLF/pyUDLF/wiki/Examples##how-to)
+* [More examples](https://github.com/UDLF/pyUDLF/wiki/Examples##more-examples)
+
+PyUDLF enables new ways to manage UDLF. But the right sequence of operations would be:
+1) [Setting the file paths](https://github.com/UDLF/pyUDLF/wiki/Examples##1-setting-the-file-paths).
+2) [Setting the values for the parameters](https://github.com/UDLF/pyUDLF/wiki/Examples##2-setting-the-values-for-the-parameters).
+3) [Execution](https://github.com/UDLF/pyUDLF/wiki/Examples##3-execution).
+4) [Results, if requested at execution](https://github.com/UDLF/pyUDLF/wiki/Examples##4-results).
 
 ----------------------
 ## Documentation
@@ -131,7 +140,8 @@ aplications
 
 ----------------------
 ## Acknowledgments
-TESTE
+
+The authors are grateful to São Paulo Research Foundation – FAPESP (grants 2013/08645-0, 2014/04220-8, 2018/15597-6) and Brazilian National Council for Scientific and Technological Development – CNPq (grants 309439/2020-5 and 422667/2021-8).
 
 ----------------------
 ## License

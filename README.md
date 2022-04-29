@@ -145,4 +145,5 @@ The authors are grateful to São Paulo Research Foundation – FAPESP (grants 20
 
 ----------------------
 ## License
-[link](https://github.com/UDLF/pyUDLF/blob/main/LICENSE)
+
+This project is licensed under GPLv2. See [details.](https://github.com/UDLF/pyUDLF/blob/main/LICENSE)

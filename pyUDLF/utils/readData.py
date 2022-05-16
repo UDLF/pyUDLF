@@ -30,7 +30,7 @@ def read_config(path):
 
 def read_log(path):
     """
-    Read config results and return 
+    Read config results and return
 
     Parameters:
         path -> log path to read, same as config path
@@ -144,7 +144,7 @@ def read_matrix_file(file_path):
         file_path -> matrix file path
 
     Returns:
-        returns a matrix 
+        returns a matrix
     """
     print("\n\tReading file", file_path)
     with open(file_path, "r") as f:
@@ -152,11 +152,15 @@ def read_matrix_file(file_path):
                 for x in f.readlines()]
 
 
-def read_classes(lists_path, classes_path):
+def read_classes(lists_path="", classes_path="", input_type=None):
     '''
     Dado o arquivo de listas e de classes no padrão do UDLF, retorna uma lista
     com a classe de cada elemento na ordem.
     '''
+    if input_type is not None:
+        classes_path = str(input_type.get_classes_file()[0].strip())
+        lists_path = str(input_type.get_lists_file()[0].strip())
+
     # lê o lists
     f = open(lists_path)
     lists = [x.strip() for x in f.readlines()]
@@ -178,43 +182,3 @@ def read_classes(lists_path, classes_path):
         classes_list.append(classes_dict[element])
 
     return classes_list
-
-
-def compute_map(rks, classes_list, map_depth=1000):
-    map_list = []
-    #class_size_dict = func
-    for i, rk in enumerate(rks):
-        acum = 0
-        value = 0
-        #cl_i = i//class_size
-        cl_i = classes_list[i]
-        # if len(rks)<=depth
-        # else colocar tamanho maximo q eh len(rks)dar um warning
-        for j in range(map_depth):
-            cl_j = classes_list[rk[j]]
-            if cl_i == cl_j:
-                value += 1
-                acum += value/(j+1)
-        map_list.append(acum/20)
-        #map_list.append(acum/class_size_dict[cl_i]) ###
-    map_value = np.mean(map_list)
-    return map_value, map_list
-
-
-def calcular():
-    # pegar tamanho dataset do config
-    pass
-
-
-def compute_precision(rk, indice, profundidade):
-    pass
-
-
-def compute_recall(rk, indice, profundidade):
-    pass
-
-
-def func():
-    # class_size_dict[0] = 10
-    # return class_size_dict
-    pass

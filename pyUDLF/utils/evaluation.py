@@ -41,7 +41,7 @@ def get_class_size_dict(class_list):
     return class_size_dict
 
 
-def compute_precision(rks, classes_list, p_depth):
+def compute_recall(rks, classes_list, p_depth):
     precision_list = []
     class_size_dict = get_class_size_dict(classes_list)
 
@@ -64,7 +64,7 @@ def compute_precision(rks, classes_list, p_depth):
     return p_value
 
 
-def compute_recall(rks, classes_list, r_depth):
+def compute_precision(rks, classes_list, r_depth):
     recall_list = []
     class_size_dict = get_class_size_dict(classes_list)
 

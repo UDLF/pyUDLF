@@ -121,7 +121,7 @@ def writeConfig(parameters, list_parameters, path="new_config.ini"):
     f = open(path, "w+")
     for param in list_parameters:
         # print("{}={}".format(param, parameters[param]), file=f)
-        if len(parameters[param]) > 2:
+        if len(parameters[param]) > 1:
             f.write("{:<37} = {:<15} #{:<30}\n".format(
                 param, parameters[param][0].strip(), parameters[param][1]))
         else:

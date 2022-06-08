@@ -61,8 +61,11 @@ def setParameter(param, value, parameters):
     if param in parameters:
         aux = getParameter(param, parameters)
 
+        # print(aux)
         parameters[param][0] = str(value)
-        parameters[param][1] = aux[1]
+
+        if(len(aux)) > 1:
+            parameters[param][1] = aux[1]
         # print("{} insert with sucess".format(param))
     else:
         print("{} does not exist in parameters!".format(param))
@@ -181,7 +184,7 @@ def list_parameter_info(parameters, list_parameters, param):
     """
 
     if param in list_parameters:
-        #print("\n...Listing parameter info!...\n")
+        # print("\n...Listing parameter info!...\n")
         if len(parameters[param]) < 2:
             print("{} = {} ".format(
                 param, parameters[param][0].strip()))

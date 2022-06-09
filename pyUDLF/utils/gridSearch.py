@@ -146,7 +146,7 @@ def find_best_param(input_type, method, param_value, list_values, ranked_list_si
     return best_dict
 
 
-def find_best_method(input_type, ranked_list_size=0):
+def find_best_method(input_type, ranked_list_size=0, verbose=True):
     """
     """
     global config_path, bin_path
@@ -223,7 +223,8 @@ def find_best_method(input_type, ranked_list_size=0):
     for method in methods[1:]:
         if True:  # (method != "RDPAC") and (method != "RLSIM"):
             input_type.set_method_name(method)
-            print(method)
+            if verbose:
+                print(method)
             # se a saida for falsa, significa que o methodo n esta configurado direito
             # , entao, colocar valores none.
             # caso contrario, funciona normalmente
@@ -276,3 +277,57 @@ def find_best_method(input_type, ranked_list_size=0):
     return best_dict
 
 # metodo rdpac e rlsim nao estao sendo contabilizados
+
+
+def find_best_method_with_best_k(input_type, measures=[], k_interval=[], ranked_list_size=0, verbose=True):
+    # input -> intervalo do k, metricas(map, precision -> list), input_type, tamanho do ranked_list
+
+    best_dict = dict()
+    best_dict_aux = dict()
+
+    old_k_dict = dict()
+
+    available_methods = input_type.get_param("UDL_METHOD")[1].strip()
+    available_methods = available_methods.split(":")[0].strip("(").strip(")")
+    available_methods = available_methods.split("|")
+
+    # saving old k values:
+    for methods in available_methods[1:]:
+        if methods != "RLSIM":
+            aux = input_type.get_param("PARAM_{}_K".format(methods))
+            if aux is not None:
+                old_k_dict[methods] = aux[0].strip()
+
+    print(old_k_dict)
+
+    for measure in measures:
+        best_dict[measure] = []
+        # measure = map, p@4,....
+        for k in k_interval:
+            for method in available_methods[1:]:
+                input_type.set_param(
+                    "PARAM_{}_K".format(method), k)
+            best_dict_aux = find_best_method(
+                input_type, ranked_list_size=280, verbose=verbose)
+
+            # taking best values:
+            # if measure exist
+            if measure in best_dict_aux:
+                # taking best available value
+                cont = 0
+                best = best_dict_aux[measure][cont]
+                while (best[0] == "NONE"):
+                    cont += 1
+                    best = best_dict_aux[measure][cont]
+
+                print(measure)
+                print(best_dict_aux[measure])
+                print("\/")
+                print(best)
+            # taking the best available parameter:
+            # best_dict[measure].append((best[0], best[1], k))
+                best_dict[measure].append((best[0], best[1], k))
+
+    # fazer
+    # atribuir valor antigo de volta nos metodos
+    print(best_dict)

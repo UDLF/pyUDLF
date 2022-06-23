@@ -293,7 +293,15 @@ def find_best_method_with_best_k(input_type, measures=[], k_interval=[], ranked_
 
     # saving old k values:
     for methods in available_methods[1:]:
-        if methods != "RLSIM":
+        if methods == "RLSIM":
+            aux = input_type.get_param("PARAM_RLSIM_TOPK")
+            if aux is not None:
+                old_k_dict[methods] = aux[0].strip()
+        elif methods == "RDPAC":
+            aux = input_type.get_param("PARAM_RDPAC_K_END".format(methods))
+            if aux is not None:
+                old_k_dict[methods] = aux[0].strip()
+        else:
             aux = input_type.get_param("PARAM_{}_K".format(methods))
             if aux is not None:
                 old_k_dict[methods] = aux[0].strip()
@@ -304,9 +312,19 @@ def find_best_method_with_best_k(input_type, measures=[], k_interval=[], ranked_
         best_dict[measure] = []
         # measure = map, p@4,....
         for k in k_interval:
+            if verbose:
+                print()
+                print(
+                    "Running for the measure {} with the value of k {}:".format(measure, k))
+                print()
             for method in available_methods[1:]:
-                input_type.set_param(
-                    "PARAM_{}_K".format(method), k)
+                if method == "RLSIM":
+                    input_type.set_param("PARAM_RLSIM_TOPK", k)
+                elif method == "RDPAC":
+                    input_type.set_param("PARAM_RDPAC_K_END", k)
+                else:
+                    input_type.set_param("PARAM_{}_K".format(method), k)
+
             best_dict_aux = find_best_method(
                 input_type, ranked_list_size=280, verbose=verbose)
 
@@ -320,14 +338,26 @@ def find_best_method_with_best_k(input_type, measures=[], k_interval=[], ranked_
                     cont += 1
                     best = best_dict_aux[measure][cont]
 
-                print(measure)
-                print(best_dict_aux[measure])
-                print("\/")
-                print(best)
-            # taking the best available parameter:
+                # To see all the values
+                # print(measure)
+                # print(best_dict_aux[measure])
+                # print("\/")
+                # print(best)
+        # taking the best available parameter:
             # best_dict[measure].append((best[0], best[1], k))
-                best_dict[measure].append((best[0], best[1], k))
+            best_dict[measure].append((best[0], best[1], k))
 
     # fazer
     # atribuir valor antigo de volta nos metodos
-    print(best_dict)
+    # atribuindo valores antigos de volta
+    for method in available_methods[1:]:
+        if method == "RLSIM":
+            input_type.set_param("PARAM_RLSIM_TOPK", old_k_dict[method])
+        elif method == "RDPAC":
+            input_type.set_param("PARAM_RDPAC_K_END", old_k_dict[method])
+        else:
+            input_type.set_param("PARAM_{}_K".format(
+                method), old_k_dict[method])
+
+    # print(best_dict)
+    return best_dict

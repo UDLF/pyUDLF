@@ -68,7 +68,7 @@ def compute_precision(rks, classes_list, p_depth):
     precision_list = []
     class_size_dict = get_class_size_dict(classes_list)
 
-    if len(rks) <= p_depth:
+    if len(rks) < p_depth:
         print("Warning, ranked_list size larger than the depth, set depth to max ranked list size!")
         p_depth = len(rks)
 
@@ -87,9 +87,12 @@ def compute_precision(rks, classes_list, p_depth):
     return round(p_value, 4), precision_list
 
 
-def compute_gain(before_rks, after_rks, classes_list, depth, measure="MAP"):
+def compute_gain(before_rks, after_rks, classes_list, depth, measure="MAP", verbose=True):
 
     measure = measure.upper()
+    if verbose:
+        print()
+        print("Calculating the gain for {} with depth {}".format(measure, depth))
 
     before_mean = 0
     after_mean = 0
@@ -111,10 +114,10 @@ def compute_gain(before_rks, after_rks, classes_list, depth, measure="MAP"):
             before_rks, classes_list, depth)
         after_mean, after_list = compute_recall(after_rks, classes_list, depth)
 
-    gain_mean = round(after_mean - before_mean, 4)
-    gain_mean_percent = round(((after_mean-before_mean)*100)/before_mean, 4)
+    #gain_mean = round(after_mean - before_mean, 4)
+    #gain_mean_percent = round(((after_mean-before_mean)*100)/before_mean, 4)
 
     for i in range(len(after_list)):
         gain_list.append((round(after_list[i]-before_list[i], 4), i))
 
-    return gain_mean, gain_list, gain_mean_percent
+    return gain_list  # gain_mean_percent, gain_mean,

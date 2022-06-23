@@ -17,6 +17,7 @@ class OutputType:
         self.rk_path = nome
         self.matrix_path = nome
         self.log_path = nome
+        self.individual_gain_list = []
 
     def get_matrix(self):
         """
@@ -62,6 +63,10 @@ class OutputType:
 
         return self.log_dict
         # original n tinha nada
+
+    def get_individual_gain_list(self):
+        # print(self.get_individual_gain_list)
+        return self.individual_gain_list
 
     def print_log(self, log_value=None):
         """

@@ -1,5 +1,6 @@
 from pyUDLF.utils import readData
 from pyUDLF.utils import outputType
+from pyUDLF.utils import evaluation
 from sys import platform
 import os
 import requests
@@ -212,7 +213,7 @@ def runWithConfig(config_file=None, get_output=False):
     return output
 
 
-def run(input_type, get_output=False):
+def run(input_type, get_output=False, compute_individual_gain=False, depth=-1):
     """
     Run with created config
 
@@ -222,11 +223,79 @@ def run(input_type, get_output=False):
     Return:
         returns an output class
     """
+
     global config_path, bin_path
     # verify_bin(config_path, bin_path)
     input_path = os.path.join(os.path.dirname(
         bin_path), "run_created_config.ini")
     input_type.write_config(input_path)
     output = runWithConfig(input_path, get_output)
+
+    if compute_individual_gain:
+
+        # verify output files
+        validation = input_type.get_param("OUTPUT_FILE")[0].strip()
+        if(not validation):
+            print("WARNING!")
+            print("Unable to calculate the individual gain, return was not requested, please check if the parameter 'OUTPUT_FILE' is true")
+            print("Running without calculating individual gain!")
+            compute_individual_gain = False
+
+        # verify necessary conditions:
+            # file format must be RK
+        file_input_format = input_type.get_param(
+            "INPUT_FILE_FORMAT")[0].strip()
+        file_output_format = input_type.get_param(
+            "OUTPUT_FILE_FORMAT")[0].strip()
+        if (file_output_format != "RK"):
+            print("ERROR!")
+            print("Output file must be in ranked list type!")
+            print("Running without calculating individual gain!")
+            compute_individual_gain = False
+
+        if (file_input_format == "MATRIX"):
+            print("ERROR!")
+            print("Input file must be in ranked list type!")
+            print("Running without calculating individual gain!")
+            compute_individual_gain = False
+
+            # numeric rk
+        rk_input_format = input_type.get_param("INPUT_RK_FORMAT")[0].strip()
+        rk_output_format = input_type.get_param("OUTPUT_RK_FORMAT")[0].strip()
+        if (rk_input_format != "NUM") or (rk_output_format != "NUM"):
+            print("ERROR!")
+            print("Input or output must be in numerical format!")
+            print("Running without calculating individual gain!")
+            compute_individual_gain = False
+
+        # verify UDL taks
+        task = input_type.get_param("UDL_TASK")[0].strip()
+        if task != "UDL":
+            print("ERROR!")
+            print("Task needs to be UDL")
+            print("Running without calculating individual gain!")
+            compute_individual_gain = False
+
+        if compute_individual_gain:
+            before_path = input_type.get_param("INPUT_FILE")[0].strip()
+            classes_list = readData.read_classes(input_type.get_lists_file()[
+                                                 0].strip(), input_type.get_classes_file()[0].strip())
+
+            rks_before = readData.read_ranked_lists_file_numeric(before_path)
+            rks_after = readData.read_ranked_lists_file_numeric(output.rk_path)
+
+            if depth == -1:
+                print("Warnig!")
+                print("Depth not set, using dataset size instead!")
+                depth = len(rks_before)
+
+            if len(rks_before) < depth:
+                print(
+                    "Warning, ranked_list size larger than the depth, set depth to max ranked list size!")
+                depth = len(rks_before)
+
+            output.individual_gain_list = evaluation.compute_gain(
+                rks_before, rks_after, classes_list, depth, measure="Precision", verbose=True)
+
     return output
     # config_path = inputType.get_generatedConfig()?

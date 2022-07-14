@@ -1,4 +1,3 @@
-from tkinter.messagebox import NO
 from pyUDLF import run_calls
 
 
@@ -10,7 +9,6 @@ def find_best_param(input_type, method, param_value, list_values, ranked_list_si
     """
     global config_path, bin_path
     type_list_values = ""
-    validation = False
 
     # verificando validade dos valores
     if param_value in input_type.list_parameters:

@@ -1,3 +1,4 @@
+from tkinter.messagebox import NO
 from pyUDLF import run_calls
 
 
@@ -8,6 +9,55 @@ def find_best_param(input_type, method, param_value, list_values, ranked_list_si
     list_values -> lista com os valores do parametro
     """
     global config_path, bin_path
+    type_list_values = ""
+    validation = False
+
+    # verificando validade dos valores
+    if param_value in input_type.list_parameters:
+        if "PARAM_{}".format(method) in param_value:
+            # eh um parametro do metodo
+            # print(isinstance(list_values[0], int))
+            aux = input_type.get_param(param_value)
+            aux = aux[1].split(":")[0]
+            if len(aux) < 8:
+                if "int" in aux:
+                    type_list_values = "int"
+                elif "float" in aux:
+                    type_list_values = "float"
+            else:
+                type_list_values = "string"
+
+            if type_list_values != "string":
+                if type_list_values == "int":
+                    for param in list_values:
+                        if type(param) is not int:
+                            print("The parameter {} accepts only integer values".format(
+                                param_value))
+                            print(
+                                "The value {} is not an integer. Execution interrupted!".format(param))
+                            return None
+                else:
+                    for param in list_values:
+                        if type(param) is not float:
+                            print("The parameter {} accepts only float values".format(
+                                param_value))
+                            print(
+                                "The value {} is not a float. Execution interrupted!".format(param))
+                            return None
+            else:
+                for value in list_values:
+                    if value not in aux:
+                        print("The value {} does not belong to the list of possible values for the parameter {}".format(
+                            value, param_value))
+                        print("Execution interrupted!")
+                        return None
+
+        else:
+            print("Parameter does not belong to the method. Execution interrupted!")
+            return None
+    else:
+        print("Parameter does not exist. Unable to execute!")
+        return None
 
     # salvando valores antigos
     old_method = input_type.get_method_name()[0].strip()
@@ -287,6 +337,34 @@ def find_best_method_with_best_k(input_type, measures=[], k_interval=[], ranked_
 
     old_k_dict = dict()
 
+    # taking measures
+    measures_list = []
+    precision_param = input_type.get_param(
+        "EFFECTIVENESS_PRECISIONS_TO_COMPUTE")
+    recall_param = input_type.get_param("EFFECTIVENESS_RECALLS_TO_COMPUTE")
+
+    precision_param = precision_param[0].strip().split(",")
+    recall_param = recall_param[0].strip().split(",")
+
+    for i in range(len(precision_param)):
+        precision_param[i] = "P@"+precision_param[i].strip()
+    for i in range(len(recall_param)):
+        recall_param[i] = "Recall@"+recall_param[i].strip()
+
+    for i in range(len(precision_param)):
+        measures_list.append(precision_param[i])
+    for i in range(len(recall_param)):
+        measures_list.append(recall_param[i])
+    measures_list.append("MAP")
+
+    # verifying if k is int
+    for param in k_interval:
+        if type(param) is not int:
+            print("ERROR!")
+            print("The parameter k accepts only integer values!")
+            print("The value {} is not an integer!".format(param))
+            return None
+
     available_methods = input_type.get_param("UDL_METHOD")[1].strip()
     available_methods = available_methods.split(":")[0].strip("(").strip(")")
     available_methods = available_methods.split("|")
@@ -306,46 +384,52 @@ def find_best_method_with_best_k(input_type, measures=[], k_interval=[], ranked_
             if aux is not None:
                 old_k_dict[methods] = aux[0].strip()
 
-    print(old_k_dict)
+    # print(old_k_dict)
 
     for measure in measures:
-        best_dict[measure] = []
-        # measure = map, p@4,....
-        for k in k_interval:
-            if verbose:
-                print()
-                print(
-                    "Running for the measure {} with the value of k {}:".format(measure, k))
-                print()
-            for method in available_methods[1:]:
-                if method == "RLSIM":
-                    input_type.set_param("PARAM_RLSIM_TOPK", k)
-                elif method == "RDPAC":
-                    input_type.set_param("PARAM_RDPAC_K_END", k)
-                else:
-                    input_type.set_param("PARAM_{}_K".format(method), k)
+        if measure in measures_list:
+            best_dict[measure] = []
+            # measure = map, p@4,....
+            for k in k_interval:
+                if verbose:
+                    print()
+                    print(
+                        "Running for the measure {} with the value of k {}:".format(measure, k))
+                    print()
+                for method in available_methods[1:]:
+                    if method == "RLSIM":
+                        input_type.set_param("PARAM_RLSIM_TOPK", k)
+                    elif method == "RDPAC":
+                        input_type.set_param("PARAM_RDPAC_K_END", k)
+                    else:
+                        input_type.set_param("PARAM_{}_K".format(method), k)
 
-            best_dict_aux = find_best_method(
-                input_type, ranked_list_size=280, verbose=verbose)
+                best_dict_aux = find_best_method(
+                    input_type, ranked_list_size=280, verbose=verbose)
 
-            # taking best values:
-            # if measure exist
-            if measure in best_dict_aux:
-                # taking best available value
-                cont = 0
-                best = best_dict_aux[measure][cont]
-                while (best[0] == "NONE"):
-                    cont += 1
+                # taking best values:
+                # if measure exist
+                if measure in best_dict_aux:
+                    # taking best available value
+                    cont = 0
                     best = best_dict_aux[measure][cont]
+                    while (best[0] == "NONE"):
+                        cont += 1
+                        best = best_dict_aux[measure][cont]
 
-                # To see all the values
-                # print(measure)
-                # print(best_dict_aux[measure])
-                # print("\/")
-                # print(best)
-        # taking the best available parameter:
-            # best_dict[measure].append((best[0], best[1], k))
-            best_dict[measure].append((best[0], best[1], k))
+                    # To see all the values
+                    # print(measure)
+                    # print(best_dict_aux[measure])
+                    # print("\/")
+                    # print(best)
+            # taking the best available parameter:
+                # best_dict[measure].append((best[0], best[1], k))
+                best_dict[measure].append((best[0], best[1], k))
+        else:
+            print()
+            print(" WARNING ! ")
+            print("Measure {} does not exist, it will not be counted!".format(measure))
+            print()
 
     # fazer
     # atribuir valor antigo de volta nos metodos

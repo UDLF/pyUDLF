@@ -161,7 +161,160 @@ def verify_running(path):
     return error_flag
 
 
-def runWithConfig(config_file=None, get_output=False):
+def individual_gain_config_running(config_file=None, depth=-1):
+    individual_gain_list = []
+
+    task = ""
+    in_file_format = ""
+    in_rk_format = ""
+    out_file = ""
+    out_file_format = ""
+    out_rk_format = ""
+    before_path = ""
+    list_path = ""
+    classes_path = ""
+    after_path = ""
+
+    with open(config_file, 'r') as f:
+        lines = [x.strip() for x in f.readlines()]
+        i = 0
+        flag = True
+        while(flag):
+            if "UDL_TASK" in lines[i]:
+                line = lines[i].split('=')
+                line = line[1].split('#')
+                line = line[0].strip()
+                task = line
+
+            if "INPUT_FILE" in lines[i]:
+                if lines[i].split('=')[0].strip() == "INPUT_FILE":
+                    line = lines[i].split('=')
+                    line = line[1].split('#')
+                    line = line[0].strip()
+                    before_path = line
+
+            if "INPUT_FILE_LIST" in lines[i]:
+                line = lines[i].split('=')
+                line = line[1].split('#')
+                line = line[0].strip()
+                list_path = line
+
+            if "INPUT_FILE_CLASSES" in lines[i]:
+                line = lines[i].split('=')
+                line = line[1].split('#')
+                line = line[0].strip()
+                classes_path = line
+
+            if "INPUT_FILE_FORMAT" in lines[i]:
+                line = lines[i].split('=')
+                line = line[1].split('#')
+                line = line[0].strip()
+                in_file_format = line
+
+            if "INPUT_RK_FORMAT" in lines[i]:
+                line = lines[i].split('=')
+                line = line[1].split('#')
+                line = line[0].strip()
+                in_rk_format = line
+
+            if "OUTPUT_FILE" in lines[i]:
+                # print(lines[i].split('=')[0])
+                if lines[i].split('=')[0].strip() == "OUTPUT_FILE":
+                    # print(lines[i])
+                    line = lines[i].split('=')
+                    line = line[1].split('#')
+                    line = line[0].strip()
+                    out_file = line
+
+            if "OUTPUT_FILE_FORMAT" in lines[i]:
+                line = lines[i].split('=')
+                line = line[1].split('#')
+                line = line[0].strip()
+                out_file_format = line
+
+            if "OUTPUT_RK_FORMAT" in lines[i]:
+                line = lines[i].split('=')
+                line = line[1].split('#')
+                line = line[0].strip()
+                out_rk_format = line
+
+            if "OUTPUT_FILE_PATH" in lines[i]:  # last
+                line = lines[i].split('=')
+                line = line[1].split('#')
+                line = line[0].strip()
+                after_path = "{}.txt".format(line)
+                flag = False
+
+            i = i + 1
+
+        # verifications
+    if task != "UDL":
+        print("ERROR!")
+        print("Task needs to be UDL")
+        print("Running without calculating individual gain!")
+        return None
+
+    if(out_file != "TRUE"):
+        print("WARNING!")
+        print("Unable to calculate the individual gain, return was not requested, please check if the parameter 'OUTPUT_FILE' is true")
+        print("Running without calculating individual gain!")
+
+    if (in_file_format == "MATRIX"):
+        print("ERROR!")
+        print("Input file must be in ranked list type!")
+        print("Running without calculating individual gain!")
+        return None
+
+    if (in_file_format == "AUTO"):
+        print("WARNING!")
+        print("Input file must be in ranked list type! This is set to AUTO!!!!")
+
+    if (in_rk_format != "NUM") or (out_rk_format != "NUM"):
+        print("ERROR!")
+        print("Input or output must be in numerical format!")
+        print("Running without calculating individual gain!")
+        return None
+
+    if (out_file_format != "RK"):
+        print("ERROR!")
+        print("Output file must be in ranked list type!")
+        print("Running without calculating individual gain!")
+        return None
+
+    classes_list = readData.read_classes(list_path, classes_path)
+    # print(classes_list)
+    rks_before = readData.read_ranked_lists_file_numeric(before_path)
+    rks_after = readData.read_ranked_lists_file_numeric(after_path)
+
+    if depth == -1:
+        print("Warnig!")
+        print("Depth not set, using dataset size instead!")
+        depth = len(rks_before)
+
+    if len(rks_before) < depth:
+        print("Warning, depth larger than the ranked_list size, set depth to max ranked list size!")
+        depth = len(rks_before)
+
+    individual_gain_list = evaluation.compute_gain(
+        rks_before, rks_after, classes_list, depth, measure="MAP", verbose=True)
+
+    # print(individual_gain_list)
+    # print(task)
+    # print(in_file_format)
+    # print(in_rk_format)
+    # print(out_file)
+    # print(out_file_format)
+    # print(out_rk_format)
+    # print(list_path)
+    # print(classes_path)
+    # print(before_path)
+    # print(after_path)
+    # print(depth)
+
+    return individual_gain_list
+
+
+def runWithConfig(config_file=None, get_output=False, compute_individual_gain=False, depth=-1):
     """
     Run with an existing config
 
@@ -188,12 +341,21 @@ def runWithConfig(config_file=None, get_output=False):
             i = 0
             flag = True
             while(flag):
+                if "OUTPUT_FILE_FORMAT" in lines[i]:
+                    line = lines[i].split('=')
+                    line = line[1].split('#')
+                    line = line[0].strip()
+                    out_format = line
+                    print(out_format)
+
                 if "OUTPUT_FILE_PATH" in lines[i]:
                     line = lines[i].split('=')
                     line = line[1].split('#')
                     line = line[0].strip()
-                    output.rk_path = "{}.txt".format(line)
-                    output.matrix_path = "{}.txt".format(line)
+                    if(out_format == "RK"):
+                        output.rk_path = "{}.txt".format(line)
+                    elif(out_format == "MATRIX"):
+                        output.matrix_path = "{}.txt".format(line)
 
                 if "OUTPUT_LOG_FILE_PATH" in lines[i]:  # last
                     line = lines[i].split('=')
@@ -206,6 +368,10 @@ def runWithConfig(config_file=None, get_output=False):
 
         # output.log_path = "{}/log.txt".format(os.path.dirname(bin_path))
         output.log_dict = readData.read_log(output.log_path)
+
+    if (compute_individual_gain):
+        output.individual_gain_list = individual_gain_config_running(
+            config_file, depth)
 
     # output.rk_path = "output.txt"
     # output.matrix_path = "output.txt"
@@ -229,73 +395,8 @@ def run(input_type, get_output=False, compute_individual_gain=False, depth=-1):
     input_path = os.path.join(os.path.dirname(
         bin_path), "run_created_config.ini")
     input_type.write_config(input_path)
-    output = runWithConfig(input_path, get_output)
-
-    if compute_individual_gain:
-
-        # verify output files
-        validation = input_type.get_param("OUTPUT_FILE")[0].strip()
-        if(not validation):
-            print("WARNING!")
-            print("Unable to calculate the individual gain, return was not requested, please check if the parameter 'OUTPUT_FILE' is true")
-            print("Running without calculating individual gain!")
-            compute_individual_gain = False
-
-        # verify necessary conditions:
-            # file format must be RK
-        file_input_format = input_type.get_param(
-            "INPUT_FILE_FORMAT")[0].strip()
-        file_output_format = input_type.get_param(
-            "OUTPUT_FILE_FORMAT")[0].strip()
-        if (file_output_format != "RK"):
-            print("ERROR!")
-            print("Output file must be in ranked list type!")
-            print("Running without calculating individual gain!")
-            compute_individual_gain = False
-
-        if (file_input_format == "MATRIX"):
-            print("ERROR!")
-            print("Input file must be in ranked list type!")
-            print("Running without calculating individual gain!")
-            compute_individual_gain = False
-
-            # numeric rk
-        rk_input_format = input_type.get_param("INPUT_RK_FORMAT")[0].strip()
-        rk_output_format = input_type.get_param("OUTPUT_RK_FORMAT")[0].strip()
-        if (rk_input_format != "NUM") or (rk_output_format != "NUM"):
-            print("ERROR!")
-            print("Input or output must be in numerical format!")
-            print("Running without calculating individual gain!")
-            compute_individual_gain = False
-
-        # verify UDL taks
-        task = input_type.get_param("UDL_TASK")[0].strip()
-        if task != "UDL":
-            print("ERROR!")
-            print("Task needs to be UDL")
-            print("Running without calculating individual gain!")
-            compute_individual_gain = False
-
-        if compute_individual_gain:
-            before_path = input_type.get_param("INPUT_FILE")[0].strip()
-            classes_list = readData.read_classes(input_type.get_lists_file()[
-                                                 0].strip(), input_type.get_classes_file()[0].strip())
-
-            rks_before = readData.read_ranked_lists_file_numeric(before_path)
-            rks_after = readData.read_ranked_lists_file_numeric(output.rk_path)
-
-            if depth == -1:
-                print("Warnig!")
-                print("Depth not set, using dataset size instead!")
-                depth = len(rks_before)
-
-            if len(rks_before) < depth:
-                print(
-                    "Warning, ranked_list size larger than the depth, set depth to max ranked list size!")
-                depth = len(rks_before)
-
-            output.individual_gain_list = evaluation.compute_gain(
-                rks_before, rks_after, classes_list, depth, measure="Precision", verbose=True)
+    output = runWithConfig(input_path, get_output,
+                           compute_individual_gain, depth)
 
     return output
     # config_path = inputType.get_generatedConfig()?

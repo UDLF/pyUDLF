@@ -8,7 +8,7 @@ class OutputType:
     Class to handle the outputs
     """
 
-    def __init__(self, nome="None"):
+    def __init__(self, nome=None):
         """
         Initial class parameters.
         """
@@ -30,7 +30,9 @@ class OutputType:
             returns a matrix
         """
         if self.matrix_path is None:
+            print("The shape of the output is not matrix!")
             return None
+
         matrix = readData.read_matrix_file(self.matrix_path)
         return matrix
 
@@ -45,6 +47,7 @@ class OutputType:
             returns a ranked list with image numbers or names
         """
         if self.rk_path is None:
+            print("The shape of the output is not RK!")
             return None
 
         rks = readData.read_ranked_lists_file_string(self.rk_path, top_k=top_k)
@@ -57,6 +60,10 @@ class OutputType:
         """
         Returns the result of the execution !
         """
+        if self.log_path is None:
+            print("Output was not requested at execution! Log does not exist!")
+            return None
+
         self.log_dict = readData.read_log(self.log_path)
         # for param in self.log_dict:
         #    print("{} = {}".format(param, self.log_dict[param])) return ou nao?
@@ -72,6 +79,10 @@ class OutputType:
         """
         Display log
         """
+        if self.log_path is None:
+            print("Output was not requested at execution! Log does not exist!")
+            return None
+
         if log_value is None:
             for param in self.log_dict:
                 print("{:<10} = {}".format(param, self.log_dict[param]))

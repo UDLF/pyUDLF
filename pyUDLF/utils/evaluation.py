@@ -6,8 +6,11 @@ def compute_map(rks, classes_list, map_depth=1000):
     class_size_dict = get_class_size_dict(classes_list)
 
     if len(rks) <= map_depth:
-        print("Warning, ranked_list size larger or equal than the depth, set depth to max ranked list size!")
+        if len(rks) < map_depth:
+            print(
+                "Warning, depth larger than the ranked_list size, set depth to max ranked list size!")
         map_depth = len(rks)
+        # print(map_depth)
 
     for i, rk in enumerate(rks):
         acum = 0
@@ -46,7 +49,9 @@ def compute_recall(rks, classes_list, r_depth):
     class_size_dict = get_class_size_dict(classes_list)
 
     if len(rks) <= r_depth:
-        print("Warning, ranked_list size larger than the depth, set depth to max ranked list size!")
+        if len(rks) < r_depth:
+            print(
+                "Warning, depth larger than the ranked_list size, set depth to max ranked list size!")
         r_depth = len(rks)
 
     for i, rk in enumerate(rks):
@@ -68,8 +73,10 @@ def compute_precision(rks, classes_list, p_depth):
     precision_list = []
     class_size_dict = get_class_size_dict(classes_list)
 
-    if len(rks) < p_depth:
-        print("Warning, ranked_list size larger than the depth, set depth to max ranked list size!")
+    if len(rks) <= p_depth:
+        if len(rks) < p_depth:
+            print(
+                "Warning, depth larger than the ranked_list size, set depth to max ranked list size!")
         p_depth = len(rks)
 
     for i, rk in enumerate(rks):
@@ -115,9 +122,13 @@ def compute_gain(before_rks, after_rks, classes_list, depth, measure="MAP", verb
         after_mean, after_list = compute_recall(after_rks, classes_list, depth)
 
     #gain_mean = round(after_mean - before_mean, 4)
-    #gain_mean_percent = round(((after_mean-before_mean)*100)/before_mean, 4)
+    # print("aqui")
+    #print(before_mean, after_mean)
+    #gain_mean_percent = round((((after_mean-before_mean))/before_mean)*100, 4)
+    #gain_mean_percent = (((after_mean-before_mean))/before_mean)*100
+    # print(gain_mean_percent)
 
     for i in range(len(after_list)):
         gain_list.append((round(after_list[i]-before_list[i], 4), i))
 
-    return gain_list  # gain_mean_percent, gain_mean,
+    return gain_list  # , gain_mean_percent, gain_mean

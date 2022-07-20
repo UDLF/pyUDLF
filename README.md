@@ -23,7 +23,7 @@ This way, all the calls are made as if the UDLF is in Python, but pyUDLF actuall
 
 ----------------------
 ## How to install
-python setup.py install (ver como escrever)
+python setup.py install
 
 ----------------------
 ## First Steps

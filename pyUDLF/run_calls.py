@@ -314,7 +314,7 @@ def individual_gain_config_running(config_file=None, depth=-1):
     return individual_gain_list
 
 
-def runWithConfig(config_file=None, get_output=False, compute_individual_gain=False, depth=-1):
+def runWithConfig(config_file=None, get_output=False, compute_individual_gain=False, depth=-1, visualization=False):
     """
     Run with an existing config
 
@@ -326,6 +326,10 @@ def runWithConfig(config_file=None, get_output=False, compute_individual_gain=Fa
     """
     global bin_path, config_path
     output = outputType.OutputType()
+    out_rk_format = ""
+    out_format = ""
+    img_path = ""
+    list_path = ""
 
     # if(config_file is None):
     #   config_file = config_path
@@ -341,12 +345,32 @@ def runWithConfig(config_file=None, get_output=False, compute_individual_gain=Fa
             i = 0
             flag = True
             while(flag):
+                if "INPUT_FILE_LIST" in lines[i]:
+                    line = lines[i].split('=')
+                    line = line[1].split('#')
+                    line = line[0].strip()
+                    list_path = line
+
+                if "INPUT_IMAGES_PATH" in lines[i]:
+                    line = lines[i].split('=')
+                    line = line[1].split('#')
+                    line = line[0].strip()
+                    img_path = line
+                    # print(out_format)
+
                 if "OUTPUT_FILE_FORMAT" in lines[i]:
                     line = lines[i].split('=')
                     line = line[1].split('#')
                     line = line[0].strip()
                     out_format = line
-                    print(out_format)
+                    # print(out_format)
+
+                if "OUTPUT_RK_FORMAT" in lines[i]:
+                    line = lines[i].split('=')
+                    line = line[1].split('#')
+                    line = line[0].strip()
+                    out_rk_format = line
+                    # print(rk_format)
 
                 if "OUTPUT_FILE_PATH" in lines[i]:
                     line = lines[i].split('=')
@@ -373,13 +397,30 @@ def runWithConfig(config_file=None, get_output=False, compute_individual_gain=Fa
         output.individual_gain_list = individual_gain_config_running(
             config_file, depth)
 
+    if (visualization):
+        if(get_output):
+            if(out_format == "RK"):
+                if(out_rk_format == "NUM"):
+                    if(os.path.isdir(img_path)):
+                        output.images_path = img_path
+                        output.list_path = list_path
+                    else:
+                        print("Directory does not exist!")
+                    # verificar se arquivo ou diretorio existe
+                else:
+                    print("The output format of the ranked lists must be 'NUM'!")
+            else:
+                print("The output file must be of type 'RK'!")
+        else:
+            print("It is necessary to request the output result!")
+
     # output.rk_path = "output.txt"
     # output.matrix_path = "output.txt"
 
     return output
 
 
-def run(input_type, get_output=False, compute_individual_gain=False, depth=-1):
+def run(input_type, get_output=False, compute_individual_gain=False, depth=-1, visualization=False):
     """
     Run with created config
 
@@ -396,7 +437,7 @@ def run(input_type, get_output=False, compute_individual_gain=False, depth=-1):
         bin_path), "run_created_config.ini")
     input_type.write_config(input_path)
     output = runWithConfig(input_path, get_output,
-                           compute_individual_gain, depth)
+                           compute_individual_gain, depth, visualization)
 
     return output
     # config_path = inputType.get_generatedConfig()?

@@ -156,6 +156,8 @@ def read_classes(lists_path="", classes_path="", input_type=None):
     '''
     Dado o arquivo de listas e de classes no padrão do UDLF, retorna uma lista
     com a classe de cada elemento na ordem.
+
+    se input foi dado, pegara dele, se nao, dos paths fornecidos
     '''
     if input_type is not None:
         classes_path = str(input_type.get_classes_file()[0].strip())

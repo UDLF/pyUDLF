@@ -1,5 +1,6 @@
+from turtle import shape
 from pyUDLF.utils import readData
-from PIL import Image
+from PIL import Image, ImageDraw
 import numpy as np
 
 # ler no config o metodo numerico ou str do rk
@@ -95,7 +96,18 @@ class OutputType:
                 for param in log_value:
                     print("{:<10} = {}".format(param, log_value[param]))
 
-    def show_rk(self, line, vis_rk_size=10):
+    def show_rk(self, line, rk_size=10, images_shape=(0, 0), start_element=0):
+        return self.__internal_rk_images_use__(line, rk_size, images_shape=images_shape, start_element=start_element)
+
+    def save_rk_img(self, line, rk_size=10, images_shape=(0, 0), img_path="", start_element=0):
+        if not isinstance(img_path, str):
+            print("ERROR! Path must be of type string")
+            return
+
+        return self.__internal_rk_images_use__(line, rk_size, images_shape=images_shape, save=True, img_path=img_path, start_element=start_element)
+
+    def __internal_rk_images_use__(self, line, rk_size=10, images_shape=(0, 0), save=False, img_path="", start_element=0):
+        min_shape = (0, 0)
 
         if self.images_path is None:
             print("Unable to generate preview, image path is empty!")
@@ -114,18 +126,45 @@ class OutputType:
         # print(only_one)
 
         images_show_list = []
-        for i in range(vis_rk_size):
+        for i in range(rk_size):
+            i += start_element
             # print(only_one[i])
             images_show_list.append(
                 self.images_path + list_test[int(only_one[i])])
 
-        imgs = [Image.open(i) for i in images_show_list]
+        imgs = [Image.open(i).convert('RGB') for i in images_show_list]
+
+        ##########################
+        test = [ImageDraw.Draw(img).rectangle(
+            [(0, 0), (img.width, img.height)], outline="red", width=4) for img in imgs]
+
+        #########################
 
         # pick the image which is the smallest, and resize the others to match it (can be arbitrary image shape here)
-        min_shape = sorted([(np.sum(i.size), i.size) for i in imgs])[0][1]
+        if all((
+                isinstance(images_shape, tuple),
+                len(images_shape) == 2,
+                isinstance(images_shape[0], int),
+                isinstance(images_shape[1], int))):
+            if (images_shape[0] == 0 and images_shape[1] == 0):
+                min_shape = sorted([(np.sum(i.size), i.size)
+                                    for i in imgs])[0][1]
+            else:
+                min_shape = images_shape
+        else:
+            print("Impossible to generate visualization.")
+            print("Image sizes must be a tuple of 2 elements of type integer.")
+            return
+
         imgs_comb = np.concatenate(
             [np.array(x.resize(min_shape)) for x in imgs], axis=1)
 
         # save that beautiful picture
         imgs_comb = Image.fromarray(imgs_comb)
-        imgs_comb.show()
+
+        if save:
+            imgs_comb.save(img_path)
+            return
+        else:
+            imgs_comb.show()
+            return imgs_comb

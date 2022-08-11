@@ -69,7 +69,7 @@ class OutputType:
             print("Output was not requested at execution! Log does not exist!")
             return None
 
-        self.log_dict = readData.read_log(self.log_path)
+        #self.log_dict = readData.read_log(self.log_path)
         # for param in self.log_dict:
         #    print("{} = {}".format(param, self.log_dict[param])) return ou nao?
 

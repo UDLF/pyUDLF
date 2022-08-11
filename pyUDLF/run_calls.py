@@ -395,6 +395,7 @@ def runWithConfig(config_file=None, get_output=False, compute_individual_gain=Fa
 
         # output.log_path = "{}/log.txt".format(os.path.dirname(bin_path))
         # esta lendo o log_out_path, q eh o log q mandei salvar junto com o binario
+        print(log_out_path)
         output.log_dict = readData.read_log(log_out_path)
         print(log_out_path)
         # apagando o log_out para n ficar la. se usuario n setar o path ele salva em lugar x.

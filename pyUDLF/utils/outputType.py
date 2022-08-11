@@ -23,6 +23,7 @@ class OutputType:
         self.individual_gain_list = []
         self.images_path = nome
         self.list_path = nome
+        self.classes_path = nome
 
     def get_matrix(self):
         """
@@ -109,6 +110,10 @@ class OutputType:
     def __internal_rk_images_use__(self, line, rk_size=10, images_shape=(0, 0), save=False, img_path="", start_element=0):
         min_shape = (0, 0)
 
+        classes_list = readData.read_classes(
+            self.list_path, self.classes_path)
+        # print(classes_list)
+
         if self.images_path is None:
             print("Unable to generate preview, image path is empty!")
             return
@@ -122,21 +127,35 @@ class OutputType:
         f.close()
         # print(list_test)
 
+        # rk line for show
         only_one = all_lines[line].split()
         # print(only_one)
-
+        # print(classes_list[int(only_one[1])])
+        # taking images class
+        images_class_list = []
         images_show_list = []
+
         for i in range(rk_size):
             i += start_element
+            # taking images class
+            images_class_list.append(classes_list[int(only_one[i])])
             # print(only_one[i])
             images_show_list.append(
                 self.images_path + list_test[int(only_one[i])])
 
         imgs = [Image.open(i).convert('RGB') for i in images_show_list]
-
+        # print(images_class_list)
         ##########################
-        test = [ImageDraw.Draw(img).rectangle(
-            [(0, 0), (img.width, img.height)], outline="red", width=4) for img in imgs]
+        for i in range(len(imgs)):
+            img = imgs[i]
+            if images_class_list[0] != images_class_list[i]:
+                ImageDraw.Draw(img).rectangle(
+                    [(0, 0), (img.width, img.height)], outline="red", width=4)
+            else:
+                ImageDraw.Draw(img).rectangle(
+                    [(0, 0), (img.width, img.height)], outline="green", width=4)
+        # test = [ImageDraw.Draw(img).rectangle(
+        #    [(0, 0), (img.width, img.height)], outline="red", width=4) for img in imgs]
 
         #########################
 

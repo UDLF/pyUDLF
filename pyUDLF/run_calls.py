@@ -354,6 +354,12 @@ def runWithConfig(config_file=None, get_output=False, compute_individual_gain=Fa
                     line = line[0].strip()
                     list_path = line
 
+                if "INPUT_FILE_CLASSES" in lines[i]:
+                    line = lines[i].split('=')
+                    line = line[1].split('#')
+                    line = line[0].strip()
+                    classes_path = line
+
                 if "INPUT_IMAGES_PATH" in lines[i]:
                     line = lines[i].split('=')
                     line = line[1].split('#')
@@ -395,11 +401,9 @@ def runWithConfig(config_file=None, get_output=False, compute_individual_gain=Fa
 
         # output.log_path = "{}/log.txt".format(os.path.dirname(bin_path))
         # esta lendo o log_out_path, q eh o log q mandei salvar junto com o binario
-        print(log_out_path)
         output.log_dict = readData.read_log(log_out_path)
-        print(log_out_path)
         # apagando o log_out para n ficar la. se usuario n setar o path ele salva em lugar x.
-        os.remove(log_out_path)
+        # os.remove(log_out_path)
 
     if (compute_individual_gain):
         output.individual_gain_list = individual_gain_config_running(
@@ -412,6 +416,7 @@ def runWithConfig(config_file=None, get_output=False, compute_individual_gain=Fa
                     if(os.path.isdir(img_path)):
                         output.images_path = img_path
                         output.list_path = list_path
+                        output.classes_path = classes_path
                     else:
                         print("Directory does not exist!")
                     # verificar se arquivo ou diretorio existe

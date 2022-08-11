@@ -137,12 +137,13 @@ def run_platform(config_file, bin_path):
     bin_path_dirname = os.path.dirname(bin_path)
     path_log_out = os.path.join(bin_path_dirname, "log_out.txt")
     cmd = "{} {} > {}".format(bin_path, config_file, path_log_out)
+
     if operating_system == "windows":
         cmd = "call "+cmd
 
     os.system(cmd)  # executa
     # return verify_running("{}/log_out.txt".format(bin_path_dirname))
-    return verify_running(path_log_out)
+    return verify_running(path_log_out), path_log_out
 
 
 def verify_running(path):
@@ -333,8 +334,10 @@ def runWithConfig(config_file=None, get_output=False, compute_individual_gain=Fa
 
     # if(config_file is None):
     #   config_file = config_path
+    run_verify, log_out_path = run_platform(config_file, bin_path)
+    #print(run_verify, log_out_path)
 
-    if run_platform(config_file, bin_path):
+    if run_verify:
         print("Could not run")
         return False
     # print("Successful execution...")
@@ -391,7 +394,10 @@ def runWithConfig(config_file=None, get_output=False, compute_individual_gain=Fa
                 i = i + 1
 
         # output.log_path = "{}/log.txt".format(os.path.dirname(bin_path))
-        output.log_dict = readData.read_log(output.log_path)
+        # esta lendo o log_out_path, q eh o log q mandei salvar junto com o binario
+        output.log_dict = readData.read_log(log_out_path)
+        # apagando o log_out para n ficar la. se usuario n setar o path ele salva em lugar x.
+        os.remove(log_out_path)
 
     if (compute_individual_gain):
         output.individual_gain_list = individual_gain_config_running(

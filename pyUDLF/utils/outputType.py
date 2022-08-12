@@ -2,6 +2,7 @@ from turtle import shape
 from pyUDLF.utils import readData
 from PIL import Image, ImageDraw
 import numpy as np
+import os
 
 # ler no config o metodo numerico ou str do rk
 
@@ -110,6 +111,11 @@ class OutputType:
     def __internal_rk_images_use__(self, line, rk_size=10, images_shape=(0, 0), save=False, img_path="", start_element=0):
         min_shape = (0, 0)
 
+        #################
+        if ((self.list_path is None) or (self.classes_path is None) or (self.images_path is None)):
+            print("Something is wrong. Unable to generate preview!")
+            return
+        ###############
         classes_list = readData.read_classes(
             self.list_path, self.classes_path)
         # print(classes_list)
@@ -142,18 +148,23 @@ class OutputType:
             # print(only_one[i])
             images_show_list.append(
                 self.images_path + list_test[int(only_one[i])])
+            if not os.path.isfile(images_show_list[i]):
+                print("No such file or directory: "+images_show_list[i])
+                return
 
         imgs = [Image.open(i).convert('RGB') for i in images_show_list]
         # print(images_class_list)
         ##########################
-        for i in range(len(imgs)):
+        ImageDraw.Draw(imgs[0]).rectangle(
+            [(0, 0), (imgs[0].width, imgs[0].height)], outline="blue", width=10)
+        for i in range(1, len(imgs)):
             img = imgs[i]
             if images_class_list[0] != images_class_list[i]:
                 ImageDraw.Draw(img).rectangle(
-                    [(0, 0), (img.width, img.height)], outline="red", width=4)
+                    [(0, 0), (img.width, img.height)], outline="red", width=10)
             else:
                 ImageDraw.Draw(img).rectangle(
-                    [(0, 0), (img.width, img.height)], outline="green", width=4)
+                    [(0, 0), (img.width, img.height)], outline="green", width=10)
         # test = [ImageDraw.Draw(img).rectangle(
         #    [(0, 0), (img.width, img.height)], outline="red", width=4) for img in imgs]
 

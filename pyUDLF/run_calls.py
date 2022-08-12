@@ -6,7 +6,8 @@ import os
 import requests
 import tarfile
 
-
+config_path = None
+bin_path = None
 # get paths
 user_home = os.path.expanduser("~/")  # user home
 # general install path (pode colocar configs tmp nele e tudo mais)
@@ -331,6 +332,14 @@ def runWithConfig(config_file=None, get_output=False, compute_individual_gain=Fa
     out_format = ""
     img_path = ""
     list_path = ""
+    classes_path = ""
+
+    if not os.path.isfile(config_path):
+        print("Config is missing! Unable to run!")
+        return
+    if not os.path.isfile(bin_path):
+        print("Binary is missing! Unable to run!")
+        return
 
     # if(config_file is None):
     #   config_file = config_path
@@ -403,7 +412,7 @@ def runWithConfig(config_file=None, get_output=False, compute_individual_gain=Fa
         # esta lendo o log_out_path, q eh o log q mandei salvar junto com o binario
         output.log_dict = readData.read_log(log_out_path)
         # apagando o log_out para n ficar la. se usuario n setar o path ele salva em lugar x.
-        # os.remove(log_out_path)
+        os.remove(log_out_path)
 
     if (compute_individual_gain):
         output.individual_gain_list = individual_gain_config_running(
@@ -418,7 +427,7 @@ def runWithConfig(config_file=None, get_output=False, compute_individual_gain=Fa
                         output.list_path = list_path
                         output.classes_path = classes_path
                     else:
-                        print("Directory does not exist!")
+                        print("Images directory does not exist!")
                     # verificar se arquivo ou diretorio existe
                 else:
                     print("The output format of the ranked lists must be 'NUM'!")
@@ -429,7 +438,6 @@ def runWithConfig(config_file=None, get_output=False, compute_individual_gain=Fa
 
     # output.rk_path = "output.txt"
     # output.matrix_path = "output.txt"
-
     return output
 
 
@@ -443,6 +451,9 @@ def run(input_type, get_output=False, compute_individual_gain=False, depth=-1, v
     Return:
         returns an output class
     """
+    if not os.path.isfile(input_type.config_path):
+        print("Unable to run, input_type was not initialized correctly!")
+        return
 
     global config_path, bin_path
     # verify_bin(config_path, bin_path)
@@ -451,6 +462,8 @@ def run(input_type, get_output=False, compute_individual_gain=False, depth=-1, v
     input_type.write_config(input_path)
     output = runWithConfig(input_path, get_output,
                            compute_individual_gain, depth, visualization)
+    # se quiser ver o config, apenas comentar a linha de baixo, pois, o run escreve o config, roda o runwithconfig e apaga depois!
+    os.remove(input_path)
 
     return output
     # config_path = inputType.get_generatedConfig()?

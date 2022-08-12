@@ -25,9 +25,14 @@ class InputType:
 
         if self.config_path is None:
             self.config_path = run_calls.config_path
+            if not os.path.isfile(self.config_path):
+                print("Config is missing! Unable to initialize inputtype")
+                return
             run_calls.verify_bin(self.config_path, run_calls.bin_path)
 
-        self.init_parameters(self.config_path)
+        aux = self.init_parameters(self.config_path)
+        if aux is None:
+            return
 
         if input_files is not None:
             self.init_data()
@@ -41,6 +46,8 @@ class InputType:
         """
         self.parameters, self.list_parameters = configGenerator.initParameters(
             path, self.parameters, self.list_parameters)
+        if self.parameters is None:
+            return None
 
     def init_data(self):
         data_paths = []

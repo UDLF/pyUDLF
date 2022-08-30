@@ -141,15 +141,26 @@ class OutputType:
         images_class_list = []
         images_show_list = []
 
-        for i in range(rk_size):
+        # taking first element
+        images_class_list.append(classes_list[int(only_one[0])])
+        # print(only_one[i])
+        images_show_list.append(
+            self.images_path + list_test[int(only_one[0])])
+        if not os.path.isfile(images_show_list[0]):
+            print("No such file or directory: "+images_show_list[0])
+            return
+
+        for i in range(1, rk_size):
+            j = i
             i += start_element
+
             # taking images class
             images_class_list.append(classes_list[int(only_one[i])])
             # print(only_one[i])
             images_show_list.append(
                 self.images_path + list_test[int(only_one[i])])
-            if not os.path.isfile(images_show_list[i]):
-                print("No such file or directory: "+images_show_list[i])
+            if not os.path.isfile(images_show_list[j]):
+                print("No such file or directory: "+images_show_list[j])
                 return
 
         imgs = [Image.open(i).convert('RGB') for i in images_show_list]

@@ -80,6 +80,15 @@ class InputType:
         """
         configGenerator.setParameter("UDL_METHOD", value, self.parameters)
 
+    def set_task(self, value):
+        """
+        Set the method to be used
+
+        Parameters:
+            value -> new method value
+        """
+        configGenerator.setParameter("UDL_TASK", value, self.parameters)
+
     def set_output_file_format(self, value):
         """
         Set the output format
@@ -272,6 +281,11 @@ class InputType:
         """
         """
         return configGenerator.getParameter("UDL_METHOD", self.parameters)
+    
+    def get_task(self):
+        """
+        """
+        return configGenerator.getParameter("UDL_TASK", self.parameters)
 
     def get_classes_file(self):
         """

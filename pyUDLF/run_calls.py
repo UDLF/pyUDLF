@@ -334,12 +334,13 @@ def runWithConfig(config_file=None, get_output=False, compute_individual_gain=Fa
     list_path = ""
     classes_path = ""
 
-    if not os.path.isfile(config_path):
-        print("Config is missing! Unable to run!")
-        return
-    if not os.path.isfile(bin_path):
-        print("Binary is missing! Unable to run!")
-        return
+    # if not os.path.isfile(config_path):
+    #    print("Config is missing! Unable to run!")
+    #    return
+    # if not os.path.isfile(bin_path):
+    #    print("Binary is missing! Unable to run!")
+    #    verify_bin(config_file, bin_path)
+    #    return
 
     # if(config_file is None):
     #   config_file = config_path

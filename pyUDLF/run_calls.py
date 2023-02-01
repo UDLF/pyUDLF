@@ -341,7 +341,7 @@ def runWithConfig(config_file=None, get_output=False, compute_individual_gain=Fa
         print("Binary is missing! Unable to run!")
         print("Downloading binary..")
         verify_bin(config_file, bin_path)
-        #return
+        # return
 
     # if(config_file is None):
     #   config_file = config_path

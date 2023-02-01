@@ -29,7 +29,7 @@ class InputType:
                 print("Config is missing! Unable to initialize inputtype")
                 print("Downloading config")
             run_calls.verify_bin(self.config_path, run_calls.bin_path)
-                print("Class inicialization sucessful!")
+            print("Class inicialization sucessful!")
 
         aux = self.init_parameters(self.config_path)
         if aux is None:

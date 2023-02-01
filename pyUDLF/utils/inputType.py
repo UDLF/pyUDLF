@@ -27,7 +27,6 @@ class InputType:
             self.config_path = run_calls.config_path
             if not os.path.isfile(self.config_path):
                 print("Config is missing! Unable to initialize inputtype")
-                print("Downloading config")
             run_calls.verify_bin(self.config_path, run_calls.bin_path)
             print("Class inicialization sucessful!")
 
@@ -282,7 +281,7 @@ class InputType:
         """
         """
         return configGenerator.getParameter("UDL_METHOD", self.parameters)
-    
+
     def get_task(self):
         """
         """

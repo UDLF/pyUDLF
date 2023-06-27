@@ -1,4 +1,4 @@
-# pyUDLF (⚠️WARNING: under development)
+
 
 **Authors:** Gustavo Rosseto Leticio, [Lucas Pascotti Valem](http://www.lucasvalem.com) and [Daniel Carlos Guimarães Pedronette](http://www.ic.unicamp.br/~dcarlos/)
 

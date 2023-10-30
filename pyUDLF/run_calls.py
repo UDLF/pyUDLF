@@ -18,6 +18,9 @@ udlf_install_path = os.path.join(
 bin_path = os.path.join(udlf_install_path, "udlf")
 config_path = os.path.join(udlf_install_path, "config.ini")
 
+original_bin_path = bin_path
+original_config_path = config_path
+
 # bin_path = "udlf"  # /usr/local/bin/.udlf_bin/bin/udlf - como estava antes !
 # config_path = "config"
 operating_system = "linuxORwindows"
@@ -34,25 +37,39 @@ elif platform == "win32":
 
 def setBinaryPath(path):
     """
-    Set the binary path
+    Set the binary path.
 
     Parameters:
-        path -> binary path
+        path (str) -> Binary path
     """
     global bin_path
-    bin_path = path
+    if os.path.isfile(path):
+        bin_path = path
+        print(f"Binary path set to: {bin_path}")
+    else:
+        print(f"File does not exist at the provided path: {path}")
+        print("Setting to the original")
+        bin_path = original_bin_path
+        print(f"Binary path set to: {bin_path}")
 
 
 def setConfigPath(path):    # configPath/config.ini
     """
-    Set the config path
+    Set the config path.
 
     Parameters:
-        path -> config path
+        path (str) -> Config path
     """
-    global config_path      # obrigatorio por nome da config
-    config_path = path
-    # configGenerator.initParameters(config_path)
+    global config_path
+    if os.path.isfile(path):
+        config_path = path
+        print(f"Config path set to: {config_path}")
+        # configGenerator.initParameters(config_path)  # Se necessário, descomente esta linha
+    else:
+        print(f"File does not exist at the provided config path: {path}")
+        print("Setting to the original")
+        config_path = original_bin_path
+        print(f"Config path set to: {config_path}")
 
 
 def getBinaryPath():
@@ -123,6 +140,7 @@ def verify_bin(config_path, bin_path):
         pass
         # print("UDLF binary files found succesfully!")
 
+verify_bin(config_path, bin_path)
 
 def run_platform(config_file, bin_path):
     global operating_system
@@ -149,18 +167,29 @@ def run_platform(config_file, bin_path):
 
 def verify_running(path):
     """
-    """
-    error_vet = ["invalid", "error", "warning", "can't"]
-    error_flag = False
-    with open(path, 'r') as f:
-        lines = [x.strip() for x in f.readlines()]
-        for i in range(len(lines)):
-            for j in range(len(error_vet)):
-                if error_vet[j] in lines[i].lower():
-                    print(lines[i])
-                    error_flag = True
+    Check a text file for error keywords or phrases in its lines. Print "warning" lines without setting an error flag.
 
+    Args:
+    path (str): The path to the text file.
+
+    Returns:
+    bool: True if any error (excluding "warning") is found, False otherwise.
+    """
+    error_flag = False
+    error_keywords = ["invalid", "error", "can't"]
+    with open(path, 'r') as file:
+        for line in file:
+            lowercase_line = line.lower()
+            for keyword in error_keywords:
+                if keyword in lowercase_line:
+                    print(line.strip())
+                    error_flag = True
+                    
+            if "warning" in lowercase_line:
+                print(line.strip())
+                
     return error_flag
+
 
 
 def individual_gain_config_running(config_file=None, depth=-1):
@@ -283,15 +312,18 @@ def individual_gain_config_running(config_file=None, depth=-1):
         print("Running without calculating individual gain!")
         return None
 
-    classes_list = readData.read_classes(list_path, classes_path)
-    # print(classes_list)
-    rks_before = readData.read_ranked_lists_file_numeric(before_path)
-    rks_after = readData.read_ranked_lists_file_numeric(after_path)
-
     if depth == -1:
         print("Warnig!")
         print("Depth not set, using dataset size instead!")
-        depth = len(rks_before)
+        tmp = []
+        with open(list_path , "r") as arquivo:
+            tmp = [linha.strip() for linha in arquivo]
+        depth = len(tmp)
+        
+    classes_list = readData.read_classes(list_path, classes_path)
+    rks_before = readData.read_ranked_lists_file_numeric(before_path,top_k = depth)
+    rks_after = readData.read_ranked_lists_file_numeric(after_path, top_k = depth)
+
 
     if len(rks_before) < depth:
         print("Warning, depth larger than the ranked_list size, set depth to max ranked list size!")
@@ -469,3 +501,5 @@ def run(input_type, get_output=False, compute_individual_gain=False, depth=-1, v
 
     return output
     # config_path = inputType.get_generatedConfig()?
+
+

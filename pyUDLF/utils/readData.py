@@ -102,38 +102,62 @@ def read_log(path):
     return log_parameters
 
 
-def read_ranked_lists_file_numeric(file_path, top_k=1000):
+def read_ranked_lists_file_numeric(file_path, top_k=-1):
     """
-    Read numeric ranked list and return it
+    Read a numeric ranked list and return it.
 
     Parameters:
-        file_path -> numeric ranked list path
-        top_k -> ranked list size
+        file_path (str): Path to the numeric ranked list file.
+        top_k (int): Ranked list size (default is -1, meaning the entire list).
 
     Returns:
-        returns a ranked list with image numbers
+        list: A ranked list with image numbers.
     """
-    print("\n\tReading file..", file_path)
+    print("\n\tReading file...", file_path)
+    
     with open(file_path, "r") as f:
-        return [[int(y) for y in x.strip().split(" ")][:top_k]
-                for x in f.readlines()]
+        ranked_list = [line.strip().split(" ") for line in f]
+
+    for i, elements in enumerate(ranked_list):
+        ranked_list[i] = [int(y) for y in elements]
+        if top_k != -1:
+            ranked_list[i] = ranked_list[i][:top_k]
+
+    if top_k != -1:
+        print("\n\t** Returned ranked list size (limited to top_k):", len(ranked_list[0]))
+    else:
+        print("\n\t** Returned all the ranked list with size:", len(ranked_list[0]))
+    
+    return ranked_list
 
 
-def read_ranked_lists_file_string(file_path, top_k=1000):
+def read_ranked_lists_file_string(file_path, top_k=-1):
     """
-    Read string ranked list and return it
+    Read a numeric ranked list and return it.
 
     Parameters:
-        file_path -> string ranked list path
-        top_k -> ranked list size
+        file_path (str): Path to the numeric ranked list file.
+        top_k (int): Ranked list size (default is -1, meaning the entire list).
 
     Returns:
-        returns a ranked list of image names
+        list: A ranked list with image numbers.
     """
-    print("\n\tReading file..", file_path)
+    print("\n\tReading file...", file_path)
+    
     with open(file_path, "r") as f:
-        return [[y for y in x.strip().split(" ")][:top_k]
-                for x in f.readlines()]
+        ranked_list = [line.strip().split(" ") for line in f]
+
+    for i, elements in enumerate(ranked_list):
+        #ranked_list[i] = [int(y) for y in elements]
+        if top_k != -1:
+            ranked_list[i] = ranked_list[i][:top_k]
+
+    if top_k != -1:
+        print("\n\t** Returned ranked list size (limited to top_k):", len(ranked_list[0]))
+    else:
+        print("\n\t** Returned all the ranked list with size:", len(ranked_list[0]))
+    
+    return ranked_list
 
 
 def read_matrix_file(file_path):

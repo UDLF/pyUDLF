@@ -58,6 +58,8 @@ def setParameter(param, value, parameters):
     Returns:
         Sucess or error message
     """
+    param = param.upper().strip()
+    
     if param in parameters:
         aux = getParameter(param, parameters)
 
@@ -82,6 +84,7 @@ def getParameter(param, parameters):
     Return:
         parameter value
     """
+    param = param.upper().strip()
     if param in parameters:
         return parameters[param]
     else:
@@ -101,6 +104,7 @@ def new_parameters(param, value, parameters, list_parameters):
     Return:
         Updated dictionary and list
     """
+    param = param.upper().strip()
     if param not in list_parameters:
         list = [value]
         parameters[param] = list
@@ -282,9 +286,13 @@ def new_fusion_parameter(value, parameters, list_parameters):
 
 
 def list_info_selected_method(method, parameters, list_parameters):
-    aux = "PARAM_{}".format(method.upper())
+    aux = "PARAM_{}".format(method.upper().strip())
     print("...Listing {} information...".format(method.upper()))
     for i in range(len(parameters)):
         if aux in list_parameters[i]:
-            print("{} = {} #{}".format(list_parameters[i],
-                  parameters[list_parameters[i]][0], parameters[list_parameters[i]][1]))
+            if len(parameters[list_parameters[i]]) > 2:
+                print("{} = {} #{}".format(list_parameters[i],
+                    parameters[list_parameters[i]][0], parameters[list_parameters[i]][1]))
+            else:
+                print("{} = {}".format(list_parameters[i],
+                    parameters[list_parameters[i]][0]))

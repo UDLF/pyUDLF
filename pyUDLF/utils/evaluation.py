@@ -1,14 +1,19 @@
 import numpy as np
 
 
-def compute_map(rks, classes_list, map_depth=1000):
+def compute_map(rks, classes_list, map_depth=-1):
     map_list = []
     class_size_dict = get_class_size_dict(classes_list)
+    
+    if map_depth == -1:
+        print("WARNING: depth of the ranked_list size not set, setting to max ranked list size!")
+        map_depth = len(rks)
+
 
     if len(rks) <= map_depth:
         if len(rks) < map_depth:
             print(
-                "Warning, depth larger than the ranked_list size, set depth to max ranked list size!")
+                "WARNING: depth larger than the ranked_list size, set depth to max ranked list size!")
         map_depth = len(rks)
         # print(map_depth)
 
@@ -44,10 +49,14 @@ def get_class_size_dict(class_list):
     return class_size_dict
 
 
-def compute_recall(rks, classes_list, r_depth):
+def compute_recall(rks, classes_list, r_depth=-1):
     recall_list = []
     class_size_dict = get_class_size_dict(classes_list)
-
+    
+    if r_depth == -1:
+        print("WARNING: depth of the ranked_list size not set, setting to max ranked list size!")
+        r = len(rks)
+        
     if len(rks) <= r_depth:
         if len(rks) < r_depth:
             print(
@@ -69,10 +78,13 @@ def compute_recall(rks, classes_list, r_depth):
     return round(r_value, 4), recall_list
 
 
-def compute_precision(rks, classes_list, p_depth):
+def compute_precision(rks, classes_list, p_depth=-1):
     precision_list = []
     class_size_dict = get_class_size_dict(classes_list)
-
+    if p_depth == -1:
+        print("WARNING: depth of the ranked_list size not set, setting to max ranked list size!")
+        p_depth = len(rks)
+        
     if len(rks) <= p_depth:
         if len(rks) < p_depth:
             print(
@@ -94,8 +106,12 @@ def compute_precision(rks, classes_list, p_depth):
     return round(p_value, 4), precision_list
 
 
-def compute_gain(before_rks, after_rks, classes_list, depth, measure="MAP", verbose=True):
-
+def compute_gain(before_rks, after_rks, classes_list, depth=-1, measure="MAP", verbose=True):
+    
+    if depth == -1:
+        print("WARNING: depth of the ranked_list size not set, setting to max ranked list size!")
+        depth = len(before_rks)
+    
     measure = measure.upper()
     if verbose:
         print()

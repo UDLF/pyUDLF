@@ -16,16 +16,17 @@ Dept. of Statistic, Applied Math. and Computing, Universidade Estadual Paulista 
 * [Contact](#contact)
 * [Acknowledgments](#acknowledgments)
 * [License](#license)
-----------------------
+
+
 ## Overview
 The <strong>pyUDLF</strong> acts as a Python wrapper for the UDLF that is in C/C++.
 This way, all the calls are made as if the UDLF is in Python, but pyUDLF actually calls from the binary of the original version. If the user does not have the binary, pyUDLF will download it and the configuration file.
 
-----------------------
+
 ## How to install
 python setup.py install
 
-----------------------
+
 ## First Steps
 1) Paths
 
@@ -52,7 +53,7 @@ In cases where the result of the operation is requested, a dictionary is returne
 
 These 4 steps are exemplified in the following topic, where a simple execution example is provided. Remember that there is more than one way to define, configure and execute.
 
-----------------------
+
 ## Execution example
 
 This example is simple, just to show one way of execution. More complex examples or different ways of execution are in [Examples](#Examples).
@@ -98,7 +99,7 @@ print(results["Time"])
 
 ```
 
-----------------------
+
 ## Examples
 More detailed examples, with further definition/configuration and execution forms, can be found on the [examples page](https://github.com/UDLF/pyUDLF/wiki/Examples). On this page you will be shown a basic step by step how to do it, not being the only way to do it, just one of them, and finally more examples, as follows: 
 
@@ -111,7 +112,7 @@ PyUDLF enables new ways to manage UDLF. But the right sequence of operations wou
 3) [Execution](https://github.com/UDLF/pyUDLF/wiki/Examples##3-execution).
 4) [Results, if requested at execution](https://github.com/UDLF/pyUDLF/wiki/Examples##4-results).
 
-----------------------
+
 ## Documentation
 
 Highest level operation of PyUDLF:
@@ -120,30 +121,54 @@ Highest level operation of PyUDLF:
 
 Documentation for the functions is available at [documentation page](https://github.com/UDLF/pyUDLF/wiki/Documentation)
 
-----------------------
+
 ## Contribution
 We welcome suggestions, ideas, and contributions.
-If you would like to contribute, feel free to [Contact](#Contact) us.
+If you would like to contribute, feel free to [contact](#Contact) us.
 
-----------------------
+
 ## Applications
 
-aplications
+The methods available in the pyUDLF framework have been utilized in a variety of multimedia and machine-learning scenarios. Among them:
+- Image and Video Retrieval
+- Person Re-ID
+- Weakly Supervised Classification
+- Clustering
 
-----------------------
+
+## Cite
+If you use this software, please cite
+
+ ```latex
+@inproceedings{pyUDLF,
+    author = {Gustavo Leticio and Lucas Pascotti Valem and Leonardo Tadeu Lopes and Daniel Carlos Guimar\~{a}es Pedronette},
+    title = {PyUDLF: A Python Framework for Unsupervised Distance Learning Tasks},
+    year = {2023},
+    isbn = {9798400701085},
+    publisher = {Association for Computing Machinery},
+    address = {New York, NY, USA},
+    url = {https://doi.org/10.1145/3581783.3613466},
+    doi = {10.1145/3581783.3613466},
+    booktitle = {Proceedings of the 31st ACM International Conference on Multimedia},
+    pages = {9680–9684},
+    numpages = {5},
+    series = {MM '23}
+}
+```
+
 ## Contact
-**Gustavo Rosseto Leticio**: `gustavo.leticio@gmail.com` ou `gustavo.leticio@unesp.br`
+**Gustavo Rosseto Leticio**: `gustavo.leticio@gmail.com` or `gustavo.leticio@unesp.br`
 
-**Lucas Pascotti Valem**: `lucaspascottivalem@gmail.com` ou `lucas.valem@unesp.br`
+**Lucas Pascotti Valem**: `lucaspascottivalem@gmail.com` or `lucas.valem@unesp.br`
 
 **Daniel Carlos Guimarães Pedronette**: `daniel.pedronette@unesp.br`
 
-----------------------
+
 ## Acknowledgments
 
 The authors are grateful to São Paulo Research Foundation – FAPESP (grants 2013/08645-0, 2014/04220-8, 2018/15597-6) and Brazilian National Council for Scientific and Technological Development – CNPq (grants 309439/2020-5 and 422667/2021-8).
 
-----------------------
+
 ## License
 
 This project is licensed under GPLv2. See [details.](https://github.com/UDLF/pyUDLF/blob/main/LICENSE)

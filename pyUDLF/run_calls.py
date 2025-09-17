@@ -1,505 +1,544 @@
-from pyUDLF.utils import readData
-from pyUDLF.utils import outputType
-from pyUDLF.utils import evaluation
-from sys import platform
 import os
 import requests
 import tarfile
+import tempfile
+import logging
+from pathlib import Path
+import subprocess
+from pyUDLF.utils import readData, outputType, evaluation, parser
+import sys
+import zipfile
 
-config_path = None
-bin_path = None
-# get paths
-user_home = os.path.expanduser("~/")  # user home
-# general install path (pode colocar configs tmp nele e tudo mais)
-pyudlf_dir = os.path.join(user_home, ".pyudlf")
-udlf_install_path = os.path.join(
-    pyudlf_dir, "bin")  # path of extracted udlf file
+# ---------- Logger configuration ----------
+logger = logging.getLogger(__name__)
+if not logger.hasHandlers(): 
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter("[%(levelname)s] %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
 
-bin_path = os.path.join(udlf_install_path, "udlf")
-config_path = os.path.join(udlf_install_path, "config.ini")
+# ---------- Paths ----------
+user_home = Path.home()
+pyudlf_dir = user_home / ".pyudlf"
+udlf_install_path = pyudlf_dir / "bin"
+
+bin_path = str(udlf_install_path / "udlf")
+config_path = str(udlf_install_path / "config.ini")
 
 original_bin_path = bin_path
 original_config_path = config_path
+compressed_binary_path = str(pyudlf_dir / "udlf_bin.tar.gz")
 
-# bin_path = "udlf"  # /usr/local/bin/.udlf_bin/bin/udlf - como estava antes !
-# config_path = "config"
-operating_system = "linuxORwindows"
-compressed_binary_path = os.path.join(pyudlf_dir, "udlf_bin.tar.gz")
-
+# ---------- Detect OS ----------
+if sys.platform.startswith("linux"):
+    operating_system = "linux"
+elif sys.platform.startswith("win"):
+    operating_system = "windows"
+else:
+    operating_system = "unsupported"
+    logger.warning("Unsupported operating system detected: %s", sys.platform)
+    
+# ---------- Binary URLs ----------
 udlf_urls = {"linux": "http://udlf_linux.lucasvalem.com",
              "windows": "http://udlf_windows.lucasvalem.com"}
 
-if "linux" in platform:
-    operating_system = "linux"
-elif platform == "win32":
-    operating_system = "windows"
-
-
-def setBinaryPath(path):
+#---------
+def setBinaryPath(path: str) -> None:
     """
-    Set the binary path.
-
-    Parameters:
-        path (str) -> Binary path
+    Update the binary path if the file exists, otherwise revert to the original.
     """
     global bin_path
     if os.path.isfile(path):
         bin_path = path
-        print(f"Binary path set to: {bin_path}")
+        logger.info(f"Binary path set to: {bin_path}")
     else:
-        print(f"File does not exist at the provided path: {path}")
-        print("Setting to the original")
+        logger.warning(f"Binary not found at: {path}. Reverting to default.")
         bin_path = original_bin_path
-        print(f"Binary path set to: {bin_path}")
+        logger.info(f"Binary path set to: {bin_path}")
 
 
-def setConfigPath(path):    # configPath/config.ini
+def getBinaryPath() -> str:
     """
-    Set the config path.
+    Return the current binary path.
+    """
+    global bin_path
+    # logger.info(f"Current binary path: {bin_path}")
+    return bin_path
 
-    Parameters:
-        path (str) -> Config path
+
+def setConfigPath(path: str) -> None:
+    """
+    Update the config path if the file exists, otherwise revert to the original.
     """
     global config_path
     if os.path.isfile(path):
         config_path = path
-        print(f"Config path set to: {config_path}")
-        # configGenerator.initParameters(config_path)  # Se necessário, descomente esta linha
+        logger.info(f"Config path set to: {config_path}")
     else:
-        print(f"File does not exist at the provided config path: {path}")
-        print("Setting to the original")
-        config_path = original_bin_path
-        print(f"Config path set to: {config_path}")
+        logger.warning(f"Config not found at: {path}. Reverting to default.")
+        config_path = original_config_path
+        logger.info(f"Config path set to: {config_path}")
 
 
-def getBinaryPath():
+def getConfigPath() -> str:
     """
-    Set the binary path
-
-    Parameters:
-        path -> binary path
-    """
-    global bin_path
-    return bin_path
-
-
-def getConfigPath():
-    """
-    Set the binary path
-
-    Parameters:
-        path -> binary path
+    Return the current config path.
     """
     global config_path
+    # logger.info(f"Current config path: {config_path}")
     return config_path
 
 
-def download_url(url, save_path, chunk_size=128):
+def download_url(url: str, save_path: str, chunk_size: int = 128) -> bool:
     """
-    """
-    print("Downloading udlf binary...")
-    r = requests.get(url, stream=True)
-    # verify if got response
-    if not r.ok:
-        return False
-    with open(save_path, 'wb') as fd:
-        for chunk in r.iter_content(chunk_size=chunk_size):
-            fd.write(chunk)
-    print("Succesfully downloaded udlf binary!")
-    return True
-
-
-def verify_bin(config_path, bin_path):
-    global operating_system
-    global compressed_binary_path
-
-    if (not os.path.isfile(bin_path)) or (not os.path.isfile(config_path)):
-        print("UDLF binary or config is missing...")
-        # create pyudlf install dir
-        # (no pyudlf precisar verificar se o binário ja existe)
-        if not os.path.isdir(pyudlf_dir):
-            os.mkdir(pyudlf_dir)
-
-        # download binary
-        # (lembrar que no windows é um zip)
-        try:
-            download_success = download_url(
-                udlf_urls[operating_system], compressed_binary_path)
-        except Exception as e:
-            print("Could not download file due to exception {}".format(e))
-        if not download_success:
-            print("Could not download file! Invalid url {}".format(
-                udlf_urls[operating_system]))
-
-        # perform extraction
-        # (lembrar que no windows é um zip)
-        file = tarfile.open(compressed_binary_path)
-        file.extractall(pyudlf_dir)
-        file.close()
-    else:
-        pass
-        # print("UDLF binary files found succesfully!")
-
-verify_bin(config_path, bin_path)
-
-def run_platform(config_file, bin_path):
-    global operating_system
-    global compressed_binary_path
-
-    if "linux" in platform:
-        operating_system = "linux"
-    elif platform == "win32":
-        operating_system = "windows"
-
-    verify_bin(config_file, bin_path)
-
-    bin_path_dirname = os.path.dirname(bin_path)
-    path_log_out = os.path.join(bin_path_dirname, "log_out.txt")
-    cmd = "{} {} > {}".format(bin_path, config_file, path_log_out)
-
-    if operating_system == "windows":
-        cmd = "call "+cmd
-
-    os.system(cmd)  # executa
-    # return verify_running("{}/log_out.txt".format(bin_path_dirname))
-    return verify_running(path_log_out), path_log_out
-
-
-def verify_running(path):
-    """
-    Check a text file for error keywords or phrases in its lines. Print "warning" lines without setting an error flag.
+    Download a file from a given URL and save it locally.
 
     Args:
-    path (str): The path to the text file.
+        url (str): URL to download the file from.
+        save_path (str): Path to save the downloaded file.
+        chunk_size (int): Size of chunks to stream the download. Default is 128.
 
     Returns:
-    bool: True if any error (excluding "warning") is found, False otherwise.
+        bool: True if download succeeded, False otherwise.
+    """
+    logger.info(f"Starting download from {url}")
+    try:
+        response = requests.get(url, stream=True, timeout=30)
+        response.raise_for_status()
+
+        save_path = Path(save_path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+
+        total_size = int(response.headers.get("content-length", 0))
+        downloaded = 0
+
+        with open(save_path, "wb") as fd:
+            for chunk in response.iter_content(chunk_size=chunk_size):
+                if chunk:
+                    fd.write(chunk)
+                    downloaded += len(chunk)
+                    if total_size > 0:
+                        percent = (downloaded / total_size) * 100
+                        logger.debug(f"Downloaded {percent:.2f}%")
+
+        logger.info(f"Download complete. File saved at: {save_path}")
+        return True
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to download UDLF binary from {url}: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error while saving binary: {e}")
+        return False
+
+
+def verify_bin(config_path: str, bin_path: str) -> None:
+    """
+    Verify if UDLF binary and config exist. If not, download and extract them.
+
+    Args:
+        config_path (str): Path to the config file.
+        bin_path (str): Path to the UDLF binary.
+    """
+    global operating_system
+    global compressed_binary_path
+
+    # Check if binary and config already exist
+    if os.path.isfile(bin_path) and os.path.isfile(config_path):
+        logger.info("UDLF binary and config found successfully.")
+        return
+
+    logger.warning("UDLF binary or config is missing...")
+
+    # Ensure ~/.pyudlf directory exists
+    logger.debug(f"Ensuring installation directory exists at {pyudlf_dir}")
+    try:
+        os.makedirs(pyudlf_dir, exist_ok=True)
+    except Exception as e:
+        logger.error(f"Could not create directory {pyudlf_dir}: {e}")
+        return
+
+    # Get download URL for the current OS
+    url = udlf_urls.get(operating_system)
+    if not url:
+        logger.error(f"No download URL available for OS: {operating_system}")
+        return
+
+    # Download the binary archive
+    logger.info(f"Attempting to download UDLF binary from {url}")
+    logger.debug(f"File will be saved to {compressed_binary_path}")
+    try:
+        download_success = download_url(url, compressed_binary_path)
+    except Exception as e:
+        logger.error(f"Could not download file due to exception: {e}")
+        return
+
+    if not download_success:
+        logger.error(f"Could not download file! Invalid URL {url}")
+        return
+
+    # Extract the binary according to the operating system
+    try:
+        if operating_system == "linux":
+            with tarfile.open(compressed_binary_path, "r:gz") as archive:
+                archive.extractall(pyudlf_dir)
+            logger.info(f"UDLF binary extracted to {pyudlf_dir} (tar.gz)")
+
+        elif operating_system == "windows":
+            with zipfile.ZipFile(compressed_binary_path, "r") as archive:
+                archive.extractall(pyudlf_dir)
+            logger.info(f"UDLF binary extracted to {pyudlf_dir} (zip)")
+
+        else:
+            logger.error(f"Unsupported operating system: {operating_system}")
+            return
+
+    except Exception as e:
+        logger.error(f"Failed to extract binary from {compressed_binary_path}: {e}")
+        return
+    logger.debug(f"Extraction complete, checking for binary at {bin_path}")
+
+
+def run_platform(config_file: str, bin_path: str):
+    """
+    Run the UDLF binary with the given config file and verify execution.
+
+    Args:
+        config_file (str): Path to the configuration file.
+        bin_path (str): Path to the UDLF binary.
+
+    Returns:
+        tuple:
+            bool: True if run completed without detected errors, False otherwise.
+            str: Path to the generated log file.
+    """
+    global operating_system
+
+    # Ensure binary and config exist (download/extract if missing)
+    verify_bin(config_file, bin_path)
+
+    # Create a unique temporary log file
+    tmp_log = tempfile.NamedTemporaryFile(suffix="_udlf_log.txt", delete=False)
+    path_log_out = tmp_log.name
+    tmp_log.close()
+
+    # Build command
+    cmd = [bin_path, config_file]
+    if operating_system == "windows":
+        cmd = ["cmd", "/c"] + cmd
+
+    logger.info(f"Running UDLF framework with config: {config_file}")
+    logger.debug(f"Command: {' '.join(cmd)}")
+    logger.debug(f"Logs will be written to: {path_log_out}")
+
+    try:
+        with open(path_log_out, "w") as log_file:
+            subprocess.run(cmd, stdout=log_file, stderr=subprocess.STDOUT, check=False)
+    except Exception as e:
+        logger.error(f"Failed to run UDLF binary: {e}")
+        return False, path_log_out
+
+    # Verify run completed successfully
+    run_ok = verify_running(path_log_out)
+    if not run_ok:
+        logger.info("UDLF run successfully.")
+    else:
+        logger.warning("UDLF run did not complete as expected.")
+
+    return run_ok, path_log_out
+
+
+def verify_running(path: str) -> bool:
+    """
+    Check a log file for error keywords or warning messages.
+
+    Args:
+        path (str): Path to the log file.
+
+    Returns:
+        bool: True if any error (excluding "warning") is found, False otherwise.
     """
     error_flag = False
-    error_keywords = ["invalid", "error", "can't"]
-    with open(path, 'r') as file:
-        for line in file:
-            lowercase_line = line.lower()
-            for keyword in error_keywords:
-                if keyword in lowercase_line:
-                    print(line.strip())
-                    error_flag = True
-                    
-            if "warning" in lowercase_line:
-                print(line.strip())
+    error_keywords = [
+        "invalid",
+        "error",
+        "can't",
+        "failed",
+        "failure",
+        "exception",
+        "traceback",
+        "not found",
+        "critical"
+    ]
+
+    try:
+        with open(path, "r", encoding="utf-8") as file:
+            for line in file:
+                lowercase_line = line.lower()
                 
+                # Check for errors
+                for keyword in error_keywords:
+                    if keyword in lowercase_line:
+                        logger.error(f"[LOG ERROR] {line.strip()}")
+                        error_flag = True
+                        break  # avoid duplicate logging if multiple keywords match
+                
+                # Check for warnings
+                if "warning" in lowercase_line:
+                    logger.warning(f"[LOG WARNING] {line.strip()}")
+    except FileNotFoundError:
+        logger.error(f"Log file not found: {path}")
+        return True#True  # treat as error
+    except Exception as e:
+        logger.error(f"Unexpected error while verifying log file {path}: {e}")
+        return True  # treat as error
+
     return error_flag
 
+def individual_gain_config_running(config_file: str, depth: int = -1):
+    """
+    Compute individual gain using parameters defined in a UDLF config file.
 
+    Args:
+        config_file (str): Path to configuration file.
+        depth (int, optional): Depth to compute gain. If -1, uses dataset size.
 
-def individual_gain_config_running(config_file=None, depth=-1):
-    individual_gain_list = []
-
-    task = ""
-    in_file_format = ""
-    in_rk_format = ""
-    out_file = ""
-    out_file_format = ""
-    out_rk_format = ""
-    before_path = ""
-    list_path = ""
-    classes_path = ""
-    after_path = ""
-
-    with open(config_file, 'r') as f:
-        lines = [x.strip() for x in f.readlines()]
-        i = 0
-        flag = True
-        while(flag):
-            if "UDL_TASK" in lines[i]:
-                line = lines[i].split('=')
-                line = line[1].split('#')
-                line = line[0].strip()
-                task = line
-
-            if "INPUT_FILE" in lines[i]:
-                if lines[i].split('=')[0].strip() == "INPUT_FILE":
-                    line = lines[i].split('=')
-                    line = line[1].split('#')
-                    line = line[0].strip()
-                    before_path = line
-
-            if "INPUT_FILE_LIST" in lines[i]:
-                line = lines[i].split('=')
-                line = line[1].split('#')
-                line = line[0].strip()
-                list_path = line
-
-            if "INPUT_FILE_CLASSES" in lines[i]:
-                line = lines[i].split('=')
-                line = line[1].split('#')
-                line = line[0].strip()
-                classes_path = line
-
-            if "INPUT_FILE_FORMAT" in lines[i]:
-                line = lines[i].split('=')
-                line = line[1].split('#')
-                line = line[0].strip()
-                in_file_format = line
-
-            if "INPUT_RK_FORMAT" in lines[i]:
-                line = lines[i].split('=')
-                line = line[1].split('#')
-                line = line[0].strip()
-                in_rk_format = line
-
-            if "OUTPUT_FILE" in lines[i]:
-                # print(lines[i].split('=')[0])
-                if lines[i].split('=')[0].strip() == "OUTPUT_FILE":
-                    # print(lines[i])
-                    line = lines[i].split('=')
-                    line = line[1].split('#')
-                    line = line[0].strip()
-                    out_file = line
-
-            if "OUTPUT_FILE_FORMAT" in lines[i]:
-                line = lines[i].split('=')
-                line = line[1].split('#')
-                line = line[0].strip()
-                out_file_format = line
-
-            if "OUTPUT_RK_FORMAT" in lines[i]:
-                line = lines[i].split('=')
-                line = line[1].split('#')
-                line = line[0].strip()
-                out_rk_format = line
-
-            if "OUTPUT_FILE_PATH" in lines[i]:  # last
-                line = lines[i].split('=')
-                line = line[1].split('#')
-                line = line[0].strip()
-                after_path = "{}.txt".format(line)
-                flag = False
-
-            i = i + 1
-
-        # verifications
-    if task != "UDL":
-        print("ERROR!")
-        print("Task needs to be UDL")
-        print("Running without calculating individual gain!")
+    Returns:
+        list or None: List of individual gains if computation is possible,
+                      None otherwise.
+    """
+    try:
+        params = parser.parse_config(config_file)
+    except Exception as e:
+        logger.error(f"Failed to parse config file {config_file}: {e}")
         return None
 
-    if(out_file != "TRUE"):
-        print("WARNING!")
-        print("Unable to calculate the individual gain, return was not requested, please check if the parameter 'OUTPUT_FILE' is true")
-        print("Running without calculating individual gain!")
-
-    if (in_file_format == "MATRIX"):
-        print("ERROR!")
-        print("Input file must be in ranked list type!")
-        print("Running without calculating individual gain!")
+    # --- Validations ---
+    if params["task"] != "UDL":
+        logger.error("Task must be UDL. Running without calculating individual gain!")
         return None
 
-    if (in_file_format == "AUTO"):
-        print("WARNING!")
-        print("Input file must be in ranked list type! This is set to AUTO!!!!")
-
-    if (in_rk_format != "NUM") or (out_rk_format != "NUM"):
-        print("ERROR!")
-        print("Input or output must be in numerical format!")
-        print("Running without calculating individual gain!")
+    if params["out_file"] != "TRUE":
+        logger.error("OUTPUT_FILE must be TRUE to calculate individual gain.")
         return None
 
-    if (out_file_format != "RK"):
-        print("ERROR!")
-        print("Output file must be in ranked list type!")
-        print("Running without calculating individual gain!")
+    if params["in_file_format"] == "MATRIX":
+        logger.error("Input file must be ranked list type, not MATRIX.")
         return None
 
+    if params["in_file_format"] == "AUTO":
+        logger.error("Input format set to AUTO. Expected ranked list type.")
+        return None
+
+    if params["in_rk_format"] != "NUM" or params["out_rk_format"] != "NUM":
+        logger.error("Input and output must be numerical (NUM) format.")
+        return None
+
+    if params["out_file_format"] != "RK":
+        logger.error("Output file must be ranked list type (RK).")
+        return None
+
+    # --- Handle depth ---
     if depth == -1:
-        print("Warnig!")
-        print("Depth not set, using dataset size instead!")
-        tmp = []
-        with open(list_path , "r") as arquivo:
-            tmp = [linha.strip() for linha in arquivo]
-        depth = len(tmp)
-        
-    classes_list = readData.read_classes(list_path, classes_path)
-    rks_before = readData.read_ranked_lists_file_numeric(before_path,top_k = depth)
-    rks_after = readData.read_ranked_lists_file_numeric(after_path, top_k = depth)
+        logger.warning("Depth not set, using dataset size instead.")
+        try:
+            with open(params["list_path"], "r") as f:
+                depth = len([line.strip() for line in f])
+        except Exception as e:
+            logger.error(f"Failed to read list file {params['list_path']} to determine depth: {e}")
+            return None
 
+    # --- Read data ---
+    try:
+        classes_list = readData.read_classes(params["list_path"], params["classes_path"])
+        rks_before = readData.read_ranked_lists_file_numeric(params["before_path"], top_k=depth)
+        rks_after = readData.read_ranked_lists_file_numeric(params["after_path"], top_k=depth)
+    except Exception as e:
+        logger.error(f"Failed to read input/output ranked lists: {e}")
+        return None
 
     if len(rks_before) < depth:
-        print("Warning, depth larger than the ranked_list size, set depth to max ranked list size!")
+        logger.warning("Depth larger than ranked list size. Adjusting depth to max size.")
         depth = len(rks_before)
 
-    individual_gain_list = evaluation.compute_gain(
-        rks_before, rks_after, classes_list, depth, measure="MAP", verbose=True)
-
-    # print(individual_gain_list)
-    # print(task)
-    # print(in_file_format)
-    # print(in_rk_format)
-    # print(out_file)
-    # print(out_file_format)
-    # print(out_rk_format)
-    # print(list_path)
-    # print(classes_path)
-    # print(before_path)
-    # print(after_path)
-    # print(depth)
-
-    return individual_gain_list
+    # --- Compute gain ---
+    try:
+        individual_gain_list = evaluation.compute_gain(
+            rks_before, rks_after, classes_list, depth, measure="MAP", verbose=True)
+        logger.info("Individual gain computation completed successfully.")
+        return individual_gain_list
+    except Exception as e:
+        logger.error(f"Error computing individual gain: {e}")
+        return None
 
 
-def runWithConfig(config_file=None, get_output=False, compute_individual_gain=False, depth=-1, visualization=False):
+def validate_config_and_binary(config_file: str, bin_path: str) -> bool:
     """
-    Run with an existing config
+    Validate that config file and binary exist. If the binary is missing,
+    attempt to download and install it.
 
-    Parameters:
-        config_file -> config name
+    Args:
+        config_file (str): Path to the configuration file.
+        bin_path (str): Path to the UDLF binary.
 
-    Return:
-        returns an output class
+    Returns:
+        bool: True if validation passes, False otherwise.
     """
-    global bin_path, config_path
-    output = outputType.OutputType()
-    out_rk_format = ""
-    out_format = ""
-    img_path = ""
-    list_path = ""
-    classes_path = ""
-
     if not os.path.isfile(config_file):
-        print("Config is missing! Unable to run!")
-        return
-    if not os.path.isfile(bin_path):
-        print("Binary is missing! Unable to run!")
-        print("Downloading binary..")
-        verify_bin(config_file, bin_path)
-        # return
-
-    # if(config_file is None):
-    #   config_file = config_path
-    run_verify, log_out_path = run_platform(config_file, bin_path)
-    #print(run_verify, log_out_path)
-
-    if run_verify:
-        print("Could not run")
+        logger.error("Config file is missing! Unable to run.")
         return False
-    # print("Successful execution...")
 
-    if (get_output is True):
-        with open(config_file, 'r') as f:
-            lines = [x.strip() for x in f.readlines()]
-            i = 0
-            flag = True
-            while(flag):
-                if "INPUT_FILE_LIST" in lines[i]:
-                    line = lines[i].split('=')
-                    line = line[1].split('#')
-                    line = line[0].strip()
-                    list_path = line
+    if not os.path.isfile(bin_path):
+        logger.warning("Binary is missing! Attempting to download...")
+        verify_bin(config_file, bin_path)
 
-                if "INPUT_FILE_CLASSES" in lines[i]:
-                    line = lines[i].split('=')
-                    line = line[1].split('#')
-                    line = line[0].strip()
-                    classes_path = line
+    return True
 
-                if "INPUT_IMAGES_PATH" in lines[i]:
-                    line = lines[i].split('=')
-                    line = line[1].split('#')
-                    line = line[0].strip()
-                    img_path = line
-                    # print(out_format)
+def prepare_visualization(params: dict, output: "OutputType") -> bool:
+    """
+    Prepare visualization data for RK/NUM outputs.
+    Updates the output object in place.
 
-                if "OUTPUT_FILE_FORMAT" in lines[i]:
-                    line = lines[i].split('=')
-                    line = line[1].split('#')
-                    line = line[0].strip()
-                    out_format = line
-                    # print(out_format)
+    Args:
+        params (dict): Parsed config parameters.
+        output (OutputType): Output object to update.
 
-                if "OUTPUT_RK_FORMAT" in lines[i]:
-                    line = lines[i].split('=')
-                    line = line[1].split('#')
-                    line = line[0].strip()
-                    out_rk_format = line
-                    # print(rk_format)
+    Returns:
+        bool: True if visualization paths were set successfully, False otherwise.
+    """
+    out_format = params.get("out_format", "")
+    out_rk_format = params.get("out_rk_format", "")
+    img_path = params.get("img_path", "")
 
-                if "OUTPUT_FILE_PATH" in lines[i]:
-                    line = lines[i].split('=')
-                    line = line[1].split('#')
-                    line = line[0].strip()
-                    if(out_format == "RK"):
-                        output.rk_path = "{}.txt".format(line)
-                    elif(out_format == "MATRIX"):
-                        output.matrix_path = "{}.txt".format(line)
+    if out_format != "RK":
+        logger.error("The output file must be of type 'RK'.")
+        return False
 
-                if "OUTPUT_LOG_FILE_PATH" in lines[i]:  # last
-                    line = lines[i].split('=')
-                    line = line[1].split('#')
-                    line = line[0].strip()
-                    output.log_path = line
-                    flag = False
+    if out_rk_format != "NUM":
+        logger.error("The output format of the ranked lists must be 'NUM'.")
+        return False
 
-                i = i + 1
+    if not os.path.isdir(img_path):
+        logger.warning(f"Images directory does not exist: {img_path}")
+        return False
 
-        # output.log_path = "{}/log.txt".format(os.path.dirname(bin_path))
-        # esta lendo o log_out_path, q eh o log q mandei salvar junto com o binario
-        output.log_dict = readData.read_log(log_out_path)
-        # apagando o log_out para n ficar la. se usuario n setar o path ele salva em lugar x.
-        os.remove(log_out_path)
+    # If everything is valid, update output
+    output.images_path = img_path
+    output.list_path = params.get("list_path", "")
+    output.classes_path = params.get("classes_path", "")
+    logger.info("Visualization paths set successfully.")
+    return True
 
-    if (compute_individual_gain):
-        output.individual_gain_list = individual_gain_config_running(
-            config_file, depth)
+def runWithConfig(
+    config_file: str = None,
+    get_output: bool = False,
+    compute_individual_gain: bool = False,
+    depth: int = -1,
+    visualization: bool = False
+):
+    """
+    Run UDLF framework with an existing configuration file.
+    """
+    global bin_path
+    output = outputType.OutputType()
 
-    if (visualization):
-        if(get_output):
-            if(out_format == "RK"):
-                if(out_rk_format == "NUM"):
-                    if(os.path.isdir(img_path)):
-                        output.images_path = img_path
-                        output.list_path = list_path
-                        output.classes_path = classes_path
-                    else:
-                        print("Images directory does not exist!")
-                    # verificar se arquivo ou diretorio existe
-                else:
-                    print("The output format of the ranked lists must be 'NUM'!")
-            else:
-                print("The output file must be of type 'RK'!")
+    # Step 1: validate config and binary
+    if not validate_config_and_binary(config_file, bin_path):
+        return False
+
+    # Step 2: run platform
+    run_ok, log_out_path = run_platform(config_file, bin_path)
+    if run_ok:
+        logger.error("UDLF execution failed.")
+        return False
+    logger.info("pyUDLF execution complete!")
+
+    # Step 3: parse config + log if requested
+    params = {}
+    if get_output:
+        try:
+            params = parser.parse_config(config_file)
+            output.rk_path = params["rk_path"]
+            output.matrix_path = params["matrix_path"]
+            output.log_path = params["log_path"]
+            output.log_dict = parser.parse_log_and_cleanup(log_out_path)
+        except Exception as e:
+            logger.error(f"Error parsing config file {config_file}: {e}")
+            return False
+
+    # Step 4: compute individual gain if requested
+    if compute_individual_gain:
+        ig_list = individual_gain_config_running(config_file, depth)
+        if ig_list is None:
+            logger.warning("Individual gain could not be computed. Continuing without it.")
         else:
-            print("It is necessary to request the output result!")
+            output.individual_gain_list = ig_list
 
-    # output.rk_path = "output.txt"
-    # output.matrix_path = "output.txt"
+    # Step 5: visualization
+    if visualization:
+        if get_output:
+            success = prepare_visualization(params, output)
+            if not success:
+                logger.error("Visualization requested but could not be prepared.")
+        else:
+            logger.error("Visualization requested but output parsing was not enabled.")
+
     return output
 
-
-def run(input_type, get_output=False, compute_individual_gain=False, depth=-1, visualization=False):
+def run(
+    input_type,
+    get_output: bool = False,
+    compute_individual_gain: bool = False,
+    depth: int = -1,
+    visualization: bool = False
+):
     """
-    Run with created config
+    Run UDLF with a generated configuration file.
 
-    Parameters:
-        input_type -> input class
+    Args:
+        input_type: InputType object, must contain a valid config_path.
+        get_output (bool, optional): If True, parse and return output paths.
+        compute_individual_gain (bool, optional): If True, compute individual gain list.
+        depth (int, optional): Depth for gain computation. Default is -1.
+        visualization (bool, optional): If True, prepare visualization info.
 
-    Return:
-        returns an output class
+    Returns:
+        OutputType or False: OutputType object with parsed results, or False if execution failed.
     """
     if not os.path.isfile(input_type.config_path):
-        print("Unable to run, input_type was not initialized correctly!")
-        return
+        logger.error("Unable to run: input_type was not initialized correctly (missing config).")
+        return False
 
-    global config_path, bin_path
-    # verify_bin(config_path, bin_path)
-    input_path = os.path.join(os.path.dirname(
-        bin_path), "run_created_config.ini")
-    input_type.write_config(input_path)
-    output = runWithConfig(input_path, get_output,
-                           compute_individual_gain, depth, visualization)
-    # se quiser ver o config, apenas comentar a linha de baixo, pois, o run escreve o config, roda o runwithconfig e apaga depois!
-    os.remove(input_path)
+    global bin_path
 
-    return output
-    # config_path = inputType.get_generatedConfig()?
+    # Create a unique temporary config file
+    tmp_file = tempfile.NamedTemporaryFile(suffix=".ini", delete=False)
+    input_path = tmp_file.name
+    tmp_file.close()  # close so input_type can write into it
 
+    try:
+        # Write config and run
+        input_type.write_config(input_path)
+        logger.debug(f"Temporary config written: {input_path}")
+
+        output = runWithConfig(
+            config_file=input_path,
+            get_output=get_output,
+            compute_individual_gain=compute_individual_gain,
+            depth=depth,
+            visualization=visualization
+        )
+
+        return output
+
+    except Exception as e:
+        logger.error(f"Error during run execution: {e}")
+        return False
+
+    finally:
+        # Always clean up temp config
+        if os.path.exists(input_path):
+            os.remove(input_path)
+            logger.debug(f"Temporary config removed: {input_path}")
 

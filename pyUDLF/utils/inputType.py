@@ -1,23 +1,33 @@
 import os
-#import logging
 from pyUDLF.utils import configGenerator
 from pyUDLF import run_calls
 from pyUDLF.utils.logger import get_logger
 from pyUDLF.utils.validations import validate_param
 
-
 logger = get_logger(__name__)
-
-#logger = logging.getLogger(__name__)
 
 class InputType:
     """
-    Class to handle the inputs
+    Handle the input configuration for UDLF executions.
+
+    This class manages input files, parameters, and config paths. It can be
+    initialized with an existing config file or with input files directly,
+    automatically preparing the configuration for UDLF.
     """
 
     def __init__(self, config_path=None, input_files=None):
         """
-        Initialize the class with optional config path and input files.
+        Initialize the InputType instance.
+
+        Args:
+            config_path (str, optional): Path to the UDLF config file. If None,
+                                         the default from run_calls is used.
+            input_files (str | list | list[list], optional): Input files to
+                                         initialize immediately.
+                                         - str: single file path
+                                         - list[str]: multiple file paths (fusion mode)
+                                         - list[list]: ranked lists, which will be
+                                                       written to disk before use
         """
         self.parameters = dict()
         self.list_parameters = []
@@ -44,13 +54,14 @@ class InputType:
 
     def init_parameters(self, path):
         """
-        Load parameters by reading the config file.
+        Load parameters from a config file.
 
         Args:
             path (str): Path to the config file.
 
         Returns:
-            bool: True if parameters loaded successfully, False otherwise.
+            bool: True if parameters were loaded successfully,
+                  False if loading failed.
         """
         self.parameters, self.list_parameters = configGenerator.initParameters(
             path, self.parameters, self.list_parameters)
@@ -63,12 +74,15 @@ class InputType:
     
     def init_data(self):
         """
-        Initialize input data depending on the type of input_files_list.
+        Initialize input data depending on the type of `input_files_list`.
 
         Cases:
-            - str: a single file path.
-            - list[str]: a list of file paths (fusion mode).
-            - list[list]: lists of ranked lists (write them to disk before using).
+            - str: single file path.
+            - list[str]: list of file paths (fusion mode).
+            - list[list]: ranked lists, written to disk before being set.
+
+        Raises:
+            ValueError: if the input_files_list type is not supported.
         """
         if not self.input_files_list:
             logger.warning("Input files list is empty. Nothing to initialize.")
@@ -105,7 +119,18 @@ class InputType:
 
     def _set_validated(self, key: str, value):
         """
-        Validate and set a config parameter. Raises ValueError if invalid.
+        Validate and set a configuration parameter.
+
+        The parameter name (`key`) is validated against the known config schema,
+        and the value is normalized using `validate_param`. If the value is invalid,
+        a ValueError is raised.
+
+        Args:
+            key (str): configuration parameter name.
+            value: value to set for the parameter.
+
+        Raises:
+            ValueError: if the value is not valid for the given parameter.
         """
         normalized = validate_param(key, value)
         configGenerator.setParameter(key, normalized, self.parameters)
@@ -113,13 +138,22 @@ class InputType:
 
     def set_method_name(self, value: str) -> None:
         """
-        Set the UDL method (e.g., NONE, CPRR, RFE).
+        Define the UDL method to be used.
+
+        Args:
+            value (str): method name.
+                         Examples: 'NONE', 'CPRR', 'RFE'.
         """
         self._set_validated("UDL_METHOD", value)
 
     def set_task(self, value: str) -> None:
         """
-        Set the UDL task type (UDL or FUSION).
+        Define the UDL task type.
+
+        Args:
+            value (str): task type.
+                         Must be either 'UDL' (single input)
+                         or 'FUSION' (multiple inputs).
         """
         self._set_validated("UDL_TASK", value)
 

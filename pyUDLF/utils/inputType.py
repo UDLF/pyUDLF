@@ -1,353 +1,605 @@
 import os
 from pyUDLF.utils import configGenerator
 from pyUDLF import run_calls
+from pyUDLF.utils.logger import get_logger
+from pyUDLF.utils.validations import validate_param
 
-
-# interface pro configGenerator
-#    parameters = dict()  # init
-#    list_parameters = dict()
-# config_path = "/home/gustavo/Desktop/UDLF/UDLF/bin/config.ini"
-
+logger = get_logger(__name__)
 
 class InputType:
     """
-    Class to handle the inputs
+    Handle the input configuration for UDLF executions.
+
+    This class manages input files, parameters, and config paths. It can be
+    initialized with an existing config file or with input files directly,
+    automatically preparing the configuration for UDLF.
     """
 
     def __init__(self, config_path=None, input_files=None):
         """
-        Initial class parameters.
+        Initialize the InputType instance.
+
+        Args:
+            config_path (str, optional): Path to the UDLF config file. If None,
+                                         the default from run_calls is used.
+            input_files (str | list | list[list], optional): Input files to
+                                         initialize immediately.
+                                         - str: single file path
+                                         - list[str]: multiple file paths (fusion mode)
+                                         - list[list]: ranked lists, which will be
+                                                       written to disk before use
         """
         self.parameters = dict()
         self.list_parameters = []
         self.input_files_list = input_files
         self.config_path = config_path
-
+        # If no config path is provided, use default from run_calls
+        # and ensure the binary/config are available
         if self.config_path is None:
             self.config_path = run_calls.config_path
             if not os.path.isfile(self.config_path):
-                print("Config is missing! Unable to initialize inputtype")
-            run_calls.verify_bin(self.config_path, run_calls.bin_path)
-            print("Class inicialization sucessful!")
+                logger.warning("Config is missing! Will try to install/verify UDLF assets.")
+                run_calls.verify_bin(self.config_path, run_calls.bin_path)
+            logger.info("InputType initialized.")
 
-        aux = self.init_parameters(self.config_path)
-        if aux is None:
+        # Load parameters from config; abort initialization if it fails
+        ok = self.init_parameters(self.config_path)  # now returns bool
+        if not ok:
+            logger.error("Failed to initialize parameters from config. Instance will be empty.")
             return
 
+        # If input_files were provided, initialize them immediately
         if input_files is not None:
             self.init_data()
 
     def init_parameters(self, path):
         """
-        Start the parameters by reading the config
+        Load parameters from a config file.
 
-        Parameters:
-            path -> config path that will be read
+        Args:
+            path (str): Path to the config file.
+
+        Returns:
+            bool: True if parameters were loaded successfully,
+                  False if loading failed.
         """
         self.parameters, self.list_parameters = configGenerator.initParameters(
             path, self.parameters, self.list_parameters)
-        if self.parameters is None:
-            return None
 
+        if not self.parameters:  # explicit check
+            logger.error("Could not load parameters from config '%s'.", path)
+            return False
+
+        return True
+    
     def init_data(self):
-        data_paths = []
-        # se for string -> eh o path
-        # se for list["",""]-> eh strings pro fusion
-        # se for list[ [rks1], [rks2] ] -> eh o arquivo, escrever e passar o path
+        """
+        Initialize input data depending on the type of `input_files_list`.
 
-        if isinstance(self.input_files_list, str):  # path
-            # vai escrever o path e colocar auto no format
+        Cases:
+            - str: single file path.
+            - list[str]: list of file paths (fusion mode).
+            - list[list]: ranked lists, written to disk before being set.
+
+        Raises:
+            ValueError: if the input_files_list type is not supported.
+        """
+        if not self.input_files_list:
+            logger.warning("Input files list is empty. Nothing to initialize.")
+            return
+
+        # Case 1: single path
+        if isinstance(self.input_files_list, str):
+            logger.debug("Initializing data with a single path.")
             self.set_input_files(self.input_files_list)
+            return
 
+        # Case 2: list input
         if isinstance(self.input_files_list, list):
-            # list de strs, ou seja, lista de paths
-            if isinstance(self.input_files_list[0], str):
+            first_elem = self.input_files_list[0]
+
+            # Case 2a: list of paths
+            if isinstance(first_elem, str):
+                logger.debug("Initializing data with a list of paths.")
                 self.set_input_files(self.input_files_list)
+                return
 
-            # list de list -> ou seja, precisa escrever
-            if isinstance(self.input_files_list[0], list):
+            # Case 2b: list of lists
+            if isinstance(first_elem, list):
+                logger.debug("Initializing data with a list of ranked lists (will be written to disk).")
                 aux = os.path.dirname(self.config_path)
                 data_paths = configGenerator.write_input_files(
-                    self.input_files_list, aux)
-                self.set_input_files(data_paths)
-
-    def set_method_name(self, value):
-        """
-        Set the method to be used
-
-        Parameters:
-            value -> new method value
-        """
-        configGenerator.setParameter("UDL_METHOD", value, self.parameters)
-
-    def set_task(self, value):
-        """
-        Set the method to be used
-
-        Parameters:
-            value -> new method value
-        """
-        configGenerator.setParameter("UDL_TASK", value, self.parameters)
-
-    def set_output_file_format(self, value):
-        """
-        Set the output format
-
-        Parameters:
-            value -> new method value
-        """
-        configGenerator.setParameter(
-            "OUTPUT_FILE_FORMAT", value, self.parameters)
-
-    def set_output_matrix_type(self, value):
-        """
-        Set the output matrix type
-
-        Parameters:
-            value -> new method value
-        """
-        configGenerator.setParameter(
-            "OUTPUT_MATRIX_TYPE", value, self.parameters)
-
-    def set_output_rk_format(self, value):
-        """
-        Set the output ranked list format
-
-        Parameters:
-            value -> new method value
-        """
-        configGenerator.setParameter(
-            "OUTPUT_RK_FORMAT", value, self.parameters)
-
-    def set_output_file_path(self, value):
-        """
-        Set the path of the output
-
-        Parameters:
-            value -> new method value
-        """
-        configGenerator.setParameter(
-            "OUTPUT_FILE_PATH", value, self.parameters)
-
-    def set_rk_format(self, value):
-        """
-        """
-        configGenerator.setParameter("INPUT_RK_FORMAT", value, self.parameters)
-
-    def set_input_matrix_type(self, value):
-        """
-        """
-        configGenerator.setParameter(
-            "INPUT_MATRIX_TYPE", value, self.parameters)
-
-    def set_input_files(self, value):
-        """
-        """
-        self.input_files_list = value
-        if isinstance(self.input_files_list, list):
-            if isinstance(self.input_files_list[0], list):
-                aux = os.path.dirname(self.config_path)
-                data_paths = configGenerator.write_input_files(
-                    self.input_files_list, aux)
+                    self.input_files_list, aux
+                )
                 self.set_input_files(data_paths)
                 return
-        configGenerator.set_input(value, self.parameters, self.list_parameters)
 
+        # Case not recognized
+        logger.error("Unsupported type for input_files_list: %s", type(self.input_files_list))
+
+    def _set_validated(self, key: str, value):
+        """
+        Validate and set a configuration parameter.
+
+        The parameter name (`key`) is validated against the known config schema,
+        and the value is normalized using `validate_param`. If the value is invalid,
+        a ValueError is raised.
+
+        Args:
+            key (str): configuration parameter name.
+            value: value to set for the parameter.
+
+        Raises:
+            ValueError: if the value is not valid for the given parameter.
+        """
+        normalized = validate_param(key, value)
+        configGenerator.setParameter(key, normalized, self.parameters)
+        logger.debug("%s set to %r", key, normalized)
+
+    def set_method_name(self, value: str) -> None:
+        """
+        Define the UDL method to be used.
+
+        Args:
+            value (str): method name.
+                         Examples: 'NONE', 'CPRR', 'RFE'.
+        """
+        self._set_validated("UDL_METHOD", value)
+
+    def set_task(self, value: str) -> None:
+        """
+        Define the UDL task type.
+
+        Args:
+            value (str): task type.
+                         Must be either 'UDL' (single input)
+                         or 'FUSION' (multiple inputs).
+        """
+        self._set_validated("UDL_TASK", value)
+
+    def set_output_file_format(self, value: str) -> None:
+        """
+        Define the output file format.
+
+        Args:
+            value (str): output format.
+                         Must be either 'RK' (ranked list) or 'MATRIX'.
+        """
+        self._set_validated("OUTPUT_FILE_FORMAT", value)
+
+    def set_output_matrix_type(self, value: str) -> None:
+        """
+        Define the type of the output matrix.
+
+        Args:
+            value (str): matrix type.
+                         Must be either 'DIST' (distance) or 'SIM' (similarity).
+        """
+        self._set_validated("OUTPUT_MATRIX_TYPE", value)
+
+    def set_output_rk_format(self, value: str) -> None:
+        """
+        Define the output ranked list format.
+
+        Args:
+            value (str): ranked list format.
+                         Must be one of: 'NUM' (numeric), 'STR' (string),
+                         'HTML' (HTML format), or 'ALL' (all formats).
+        """
+        self._set_validated("OUTPUT_RK_FORMAT", value)
+
+
+    def set_output_file_path(self, value: str) -> None:
+        """
+        Set the path of the output file.
+
+        Args:
+            value (str): path to the output (base name, without extension).
+        """
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("Invalid output file path. Must be a non-empty string.")
+        configGenerator.setParameter("OUTPUT_FILE_PATH", value, self.parameters)
+        logger.debug("OUTPUT_FILE_PATH set to %r", value)
+
+
+    def set_rk_format(self, value: str) -> None:
+        """
+        Define the ranked list input format.
+
+        Args:
+            value (str): format of the input ranked list.
+                         Must be either 'NUM' (numeric) or 'STR' (string).
+        """
+        self._set_validated("INPUT_RK_FORMAT", value)
+
+    def set_input_matrix_type(self, value: str) -> None:
+        """
+        Define the type of the input matrix.
+
+        Args:
+            value (str): type of the matrix.
+                         Must be either 'DIST' (distance) or 'SIM' (similarity).
+        """
+        self._set_validated("INPUT_MATRIX_TYPE", value)
+
+    def set_matrix_to_rk_sorting(self, value: str) -> None:
+        """
+        Define the sorting algorithm used when converting a matrix into ranked lists.
+
+        Args:
+            value (str): sorting method.
+                         Must be either 'HEAP' or 'INSERTION'.
+        """
+        self._set_validated("MATRIX_TO_RK_SORTING", value)
+
+    
+    def set_input_files(self, value):
+        """
+        Set the input files.
+
+        Accepts:
+            - str: path to a single file.
+            - list[str]: multiple file paths (fusion).
+            - list[list]: ranked lists to be written to disk.
+
+        Raises:
+            TypeError: if value type is unsupported.
+        """
+        if not isinstance(value, (str, list)):
+            raise TypeError(
+                f"Invalid input type for set_input_files: {type(value)}. "
+                "Must be str, list[str], or list[list]."
+            )
+
+        self.input_files_list = value
+
+        if isinstance(value, list):
+            if len(value) == 0:
+                raise ValueError("Input file list cannot be empty.")
+
+            if isinstance(value[0], list):
+                aux = os.path.dirname(self.config_path)
+                data_paths = configGenerator.write_input_files(self.input_files_list, aux)
+                self.set_input_files(data_paths)
+                return
+
+            if not all(isinstance(elem, str) for elem in value):
+                raise TypeError("All elements of input_files_list must be strings.")
+
+        configGenerator.set_input(value, self.parameters, self.list_parameters)
+    
     def set_ranked_lists_size(self, value):
         """
-        Set ALL ranked lists sizes!
+        Set ALL ranked lists sizes at once.
+
+        Special case: updates multiple parameters (all *_L).
+
+        Args:
+            value (int): size of ranked lists. Must be a positive integer.
         """
+        if not isinstance(value, int) or value <= 0:
+            raise ValueError(
+                f"Invalid ranked list size: {value}. Must be a positive integer."
+            )
+
         configGenerator.set_all_ranked_lists_size(
-            value, self.parameters, self.list_parameters)
+            value, self.parameters, self.list_parameters
+        )    
 
-    def set_dataset_size(self, value):
+    def set_dataset_size(self, value: int) -> None:
         """
-        """
-        configGenerator.setParameter("SIZE_DATASET", value, self.parameters)
+        Set the dataset size.
 
-    def set_lists_file(self, value):
+        Args:
+            value (int): total number of elements in the dataset.
         """
-        """
-        configGenerator.setParameter("INPUT_FILE_LIST", value, self.parameters)
+        if not isinstance(value, int) or value <= 0:
+            raise ValueError(
+                f"Invalid dataset size: {value}. Must be a positive integer."
+            )
+        self._set_validated("SIZE_DATASET", value)
 
-    def set_classes_file(self, value):
+    def set_lists_file(self, value: str) -> None:
         """
-        """
-        configGenerator.setParameter(
-            "INPUT_FILE_CLASSES", value, self.parameters)
+        Set the path to the input file list.
 
-    def set_output_log_file(self, value):
+        Args:
+            value (str): path to the file list.
         """
-        Set path of the output log
-        """
-        configGenerator.setParameter(
-            "OUTPUT_LOG_FILE_PATH", value, self.parameters)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("Invalid lists file path. Must be a non-empty string.")
+        self._set_validated("INPUT_FILE_LIST", value)
 
-    def add_new_parameter(self, param, value):
+
+    def set_classes_file(self, value: str) -> None:
         """
+        Set the path to the classes file.
+
+        Args:
+            value (str): path to the classes file.
         """
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("Invalid classes file path. Must be a non-empty string.")
+        self._set_validated("INPUT_FILE_CLASSES", value)
+
+    def set_output_log_file(self, value: str) -> None:
+        """
+        Set the path of the output log.
+
+        Args:
+            value (str): path to the log file.
+        """
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("Invalid log file path. Must be a non-empty string.")
+        self._set_validated("OUTPUT_LOG_FILE_PATH", value)
+
+    def add_new_parameter(self, param: str, value) -> None:
+        """
+        Add a completely new parameter to the config.
+
+        Args:
+            param (str): parameter name (must not be empty).
+            value: parameter value.
+        """
+        if not isinstance(param, str) or not param.strip():
+            raise ValueError("Parameter name must be a non-empty string.")
         configGenerator.new_parameters(
-            param, value, self.parameters, self.list_parameters)
+            param, value, self.parameters, self.list_parameters
+        )
 
-    def add_input_files(self, value):
+    def add_input_files(self, value) -> None:
         """
+        Add new input files in fusion mode.
+
+        Args:
+            value (str | list): new file(s) to add.
         """
+        if not isinstance(value, (str, list)):
+            raise TypeError(
+                f"Invalid type for input files: {type(value)}. Must be str or list."
+            )
         configGenerator.new_fusion_parameter(
-            value, self.parameters, self.list_parameters)
+            value, self.parameters, self.list_parameters
+        )
 
-    def set_input_rk_format(self, value):
+ 
+    def set_input_images_path(self, value: str) -> None:
         """
-        """
-        configGenerator.setParameter("INPUT_RK_FORMAT", value, self.parameters)
+        Set the path to the input images.
 
-    def set_matrix_to_rk_sorting(self, value):
+        Args:
+            value (str): path to the images directory.
         """
-        """
-        configGenerator.setParameter(
-            "MATRIX_TO_RK_SORTING", value, self.parameters)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("Invalid images path. Must be a non-empty string.")
+        self._set_validated("INPUT_IMAGES_PATH", value)
 
-    def set_input_images_path(self, value):
+    def set_param(self, param: str, value) -> None:
         """
-        """
-        configGenerator.setParameter(
-            "INPUT_IMAGES_PATH", value, self.parameters)
+        Change the value of an existing parameter.
 
-    def set_param(self, param, value):
+        Args:
+            param (str): name of the parameter to change (must exist).
+            value: new value for the parameter.
         """
-        Change the value of some parameter
-        The parameter must exist
-
-        Parameters:
-            param -> parameter to be changed
-            value -> new value
-        """
+        if not isinstance(param, str) or not param.strip():
+            raise ValueError("Parameter name must be a non-empty string.")
         configGenerator.setParameter(param, value, self.parameters)
 
-    def get_param(self, param):
+    def get_param(self, param: str):
         """
-        Get parameter value
+        Get the value of a parameter.
 
-        Parameters:
-            param -> parameter to get the value
+        Args:
+            param (str): name of the parameter to retrieve.
 
-        Return:
-            parameter value
+        Returns:
+            The parameter value.
         """
+        if not isinstance(param, str) or not param.strip():
+            raise ValueError("Parameter name must be a non-empty string.")
         return configGenerator.getParameter(param, self.parameters)
 
-    def write_config(self, path="new_config.ini"):  # path precisa do nome
+    def write_config(self, path: str = "new_config.ini") -> None:
         """
-        Write new config
+        Write the current configuration to a file.
 
-        Parameters:
-            path -> path with the name of the new config
+        Args:
+            path (str): path to the new config file. Must be a non-empty string
+                        and should end with '.ini'.
         """
+        if not isinstance(path, str) or not path.strip():
+            raise ValueError("Config file path must be a non-empty string.")
+        if not path.endswith(".ini"):
+            raise ValueError("Config file path must end with '.ini'.")
         configGenerator.writeConfig(
-            self.parameters, self.list_parameters, path)
+            self.parameters, self.list_parameters, path
+        )
 
-    def list_parameters_names(self):
+    def list_parameters_names(self) -> None:
         """
-        Displays parameters without values
+        Display parameter names (without values).
         """
         configGenerator.listParameters(self.list_parameters)
 
-    def list_param_full(self):
+    def list_param_full(self) -> None:
         """
-        Displays parameters with values and information
+        Display all parameters with values and comments (detailed view).
         """
         configGenerator.list_config_full(
-            self.parameters, self.list_parameters)
+            self.parameters, self.list_parameters
+        )
 
-    def list_param(self):
+    def list_param(self) -> None:
         """
-        Displays parameters with values and without information
+        Display all parameters with values only (no comments).
         """
-        configGenerator.list_config(self.parameters, self.list_parameters)
+        configGenerator.list_config(
+            self.parameters, self.list_parameters
+        )
 
-    def list_param_info(self, param):
+    def list_param_info(self, param: str) -> None:
         """
-        Displays parameter with values and information
+        Display detailed information about a specific parameter,
+        including its value and comments.
+
+        Args:
+            param (str): name of the parameter.
         """
+        if not isinstance(param, str) or not param.strip():
+            raise ValueError("Parameter name must be a non-empty string.")
         configGenerator.list_parameter_info(
-            self.parameters, self.list_parameters, param)
+            self.parameters, self.list_parameters, param
+        )
 
-    def list_method_info(self, method):
+    def list_method_info(self, method: str) -> None:
         """
+        Display information about a specific UDL method.
+
+        Args:
+            method (str): method name.
         """
+        if not isinstance(method, str) or not method.strip():
+            raise ValueError("Method name must be a non-empty string.")
         configGenerator.list_info_selected_method(
-            method, self.parameters, self.list_parameters)
+            method, self.parameters, self.list_parameters
+        )
 
     def get_method_name(self):
         """
+        Get the current UDL method.
+
+        Returns:
+            str | list: the configured method(s).
         """
         return configGenerator.getParameter("UDL_METHOD", self.parameters)
 
     def get_task(self):
         """
+        Get the current UDL task type (UDL or FUSION).
+
+        Returns:
+            str: the configured task type.
         """
         return configGenerator.getParameter("UDL_TASK", self.parameters)
 
     def get_classes_file(self):
         """
+        Get the path to the classes file.
+
+        Returns:
+            str: path to the classes file.
         """
         return configGenerator.getParameter("INPUT_FILE_CLASSES", self.parameters)
 
     def get_lists_file(self):
         """
+        Get the path to the input file list.
+
+        Returns:
+            str: path to the file list.
         """
         return configGenerator.getParameter("INPUT_FILE_LIST", self.parameters)
 
     def get_dataset_size(self):
         """
+        Get the dataset size.
+
+        Returns:
+            int: total number of elements in the dataset.
         """
         return configGenerator.getParameter("SIZE_DATASET", self.parameters)
 
     def get_output_log_file(self):
         """
+        Get the path of the output log file.
+
+        Returns:
+            str: path to the log file.
         """
         return configGenerator.getParameter("OUTPUT_LOG_FILE_PATH", self.parameters)
 
     def get_input_files(self):
         """
+        Get the configured input files.
+
+        Returns:
+            str | list[str]: path(s) to the input file(s).
+                            - str if UDL task
+                            - list[str] if FUSION task
         """
-        return configGenerator.get_input_files_parameters(self.parameters, self.list_parameters)
+        return configGenerator.get_input_files_parameters(
+            self.parameters, self.list_parameters
+        )
 
     def get_output_file_format(self):
         """
+        Get the output file format.
+
+        Returns:
+            str: output format (e.g., 'RK' or 'MATRIX').
         """
         return configGenerator.getParameter("OUTPUT_FILE_FORMAT", self.parameters)
 
     def get_output_matrix_type(self):
         """
+        Get the output matrix type.
+
+        Returns:
+            str: output matrix type ('DIST' or 'SIM').
         """
         return configGenerator.getParameter("OUTPUT_MATRIX_TYPE", self.parameters)
 
     def get_output_rk_format(self):
         """
+        Get the output ranked list format.
+
+        Returns:
+            str: output ranked list format ('NUM', 'STR', 'HTML', 'ALL').
         """
         return configGenerator.getParameter("OUTPUT_RK_FORMAT", self.parameters)
 
     def get_output_file_path(self):
         """
+        Get the base path of the output file.
+
+        Returns:
+            str: path where output will be saved (without extension).
         """
         return configGenerator.getParameter("OUTPUT_FILE_PATH", self.parameters)
 
     def get_input_matrix_type(self):
         """
+        Get the input matrix type.
+
+        Returns:
+            str: input matrix type ('DIST' or 'SIM').
         """
         return configGenerator.getParameter("INPUT_MATRIX_TYPE", self.parameters)
 
     def get_input_rk_format(self):
         """
+        Get the input ranked list format.
+
+        Returns:
+            str: input ranked list format ('NUM' or 'STR').
         """
         return configGenerator.getParameter("INPUT_RK_FORMAT", self.parameters)
 
     def get_matrix_to_rk_sorting(self):
         """
+        Get the sorting method used to convert matrices into ranked lists.
+
+        Returns:
+            str: sorting method ('HEAP' or 'INSERTION').
         """
         return configGenerator.getParameter("MATRIX_TO_RK_SORTING", self.parameters)
 
     def get_input_images_path(self):
         """
+        Get the path to the input images.
+
+        Returns:
+            str: path to the images directory.
         """
         return configGenerator.getParameter("INPUT_IMAGES_PATH", self.parameters)

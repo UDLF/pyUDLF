@@ -8,15 +8,18 @@ import subprocess
 from pyUDLF.utils import readData, outputType, evaluation, parser
 import sys
 import zipfile
+from pyUDLF.utils.logger import get_logger
+
 
 # ---------- Logger configuration ----------
-logger = logging.getLogger(__name__)
-if not logger.hasHandlers(): 
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter("[%(levelname)s] %(message)s")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
+# logger = logging.getLogger(__name__)
+# if not logger.hasHandlers(): 
+#     handler = logging.StreamHandler()
+#     formatter = logging.Formatter("[%(levelname)s] %(message)s")
+#     handler.setFormatter(formatter)
+#     logger.addHandler(handler)
+#     logger.setLevel(logging.INFO)
+logger = get_logger(__name__)
 
 # ---------- Paths ----------
 user_home = Path.home()
@@ -249,15 +252,58 @@ def run_platform(config_file: str, bin_path: str):
     return run_ok, path_log_out
 
 
+# def verify_running(path: str) -> bool:
+#     """
+#     Check a log file for error keywords or warning messages.
+
+#     Args:
+#         path (str): Path to the log file.
+
+#     Returns:
+#         bool: True if any error (excluding "warning") is found, False otherwise.
+#     """
+#     error_flag = False
+#     error_keywords = [
+#         "invalid",
+#         "error",
+#         "can't",
+#         "failed",
+#         "failure",
+#         "exception",
+#         "traceback",
+#         "not found",
+#         "critical"
+#     ]
+
+#     try:
+#         with open(path, "r", encoding="utf-8") as file:
+#             for line in file:
+#                 lowercase_line = line.lower()
+                
+#                 # Check for errors
+#                 for keyword in error_keywords:
+#                     if keyword in lowercase_line:
+#                         logger.error(f"[LOG ERROR] {line.strip()}")
+#                         error_flag = True
+#                         break  # avoid duplicate logging if multiple keywords match
+                
+#                 # Check for warnings
+#                 if "warning" in lowercase_line:
+#                     logger.warning(f"[LOG WARNING] {line.strip()}")
+#     except FileNotFoundError:
+#         logger.error(f"Log file not found: {path}")
+#         return True#True  # treat as error
+#     except Exception as e:
+#         logger.error(f"Unexpected error while verifying log file {path}: {e}")
+#         return True  # treat as error
+
+#     return error_flag
 def verify_running(path: str) -> bool:
     """
     Check a log file for error keywords or warning messages.
 
-    Args:
-        path (str): Path to the log file.
-
     Returns:
-        bool: True if any error (excluding "warning") is found, False otherwise.
+        bool: True if any error (or aborting warning) is found, False otherwise.
     """
     error_flag = False
     error_keywords = [
@@ -276,23 +322,26 @@ def verify_running(path: str) -> bool:
         with open(path, "r", encoding="utf-8") as file:
             for line in file:
                 lowercase_line = line.lower()
-                
+
                 # Check for errors
-                for keyword in error_keywords:
-                    if keyword in lowercase_line:
-                        logger.error(f"[LOG ERROR] {line.strip()}")
-                        error_flag = True
-                        break  # avoid duplicate logging if multiple keywords match
-                
+                if any(keyword in lowercase_line for keyword in error_keywords):
+                    logger.error(f"[LOG ERROR] {line.strip()}")
+                    error_flag = True
+
                 # Check for warnings
                 if "warning" in lowercase_line:
                     logger.warning(f"[LOG WARNING] {line.strip()}")
+                    # Special case: warnings that abort execution
+                    if "abort" in lowercase_line:
+                        logger.error(f"[LOG ABORT] Execution stopped due to warning: {line.strip()}")
+                        error_flag = True
+
     except FileNotFoundError:
         logger.error(f"Log file not found: {path}")
-        return True#True  # treat as error
+        return True
     except Exception as e:
         logger.error(f"Unexpected error while verifying log file {path}: {e}")
-        return True  # treat as error
+        return True
 
     return error_flag
 

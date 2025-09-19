@@ -133,6 +133,25 @@ class InputType:
             ValueError: if the value is not valid for the given parameter.
         """
         normalized = validate_param(key, value)
+        
+            # --- FIX para listas virarem CSV no .ini ---
+        if key in {"EFFECTIVENESS_RECALLS_TO_COMPUTE", "EFFECTIVENESS_PRECISIONS_TO_COMPUTE"}:
+            # Aceita tanto lista quanto string e normaliza para "1,2,5,10,15"
+            if isinstance(normalized, (list, tuple, set)):
+                try:
+                    normalized = ",".join(str(int(v)) for v in normalized)
+                except Exception:
+                    raise ValueError(
+                        f"{key} must be a list of positive integers or a CSV string."
+                    )
+            elif isinstance(normalized, str):
+                parts = [p.strip() for p in normalized.replace(" ", "").split(",") if p.strip()]
+                if not parts or not all(p.isdigit() and int(p) > 0 for p in parts):
+                    raise ValueError(f"{key} must be a CSV of positive integers, got: {normalized!r}")
+                normalized = ",".join(parts)
+            else:
+                raise ValueError(f"{key} must be a list[int] or CSV string, got {type(normalized)}")
+
         configGenerator.setParameter(key, normalized, self.parameters)
         logger.debug("%s set to %r", key, normalized)
 
@@ -156,6 +175,48 @@ class InputType:
                          or 'FUSION' (multiple inputs).
         """
         self._set_validated("UDL_TASK", value)
+
+    def set_input_file_format(self, value: str) -> None:
+        """
+        Define the input file format.
+
+        Args:
+            value (str): format of the input file.
+                         Must be one of: 'AUTO', 'MATRIX', 'RK'.
+
+        Raises:
+            ValueError: if the value is not a valid format.
+        """
+        self._set_validated("INPUT_FILE_FORMAT", value)
+
+    def set_input_file(self, value: str) -> None:
+        """
+        Define the path to the main input file (matrix or ranked lists).
+
+        Args:
+            value (str): path to the input file.
+
+        Raises:
+            ValueError: if value is not a non-empty string.
+        """
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("Invalid input file path. Must be a non-empty string.")
+        self._set_validated("INPUT_FILE", value)
+
+    def set_output_file(self, value: bool) -> None:
+        """
+        Enable or disable generation of output files.
+
+        Args:
+            value (bool): True to generate output files, False otherwise.
+
+        Raises:
+            ValueError: if value is not boolean.
+        """
+        if not isinstance(value, bool):
+            raise ValueError("Invalid output_file value. Must be True or False.")
+        # no validate_param domain? convertemos para string "TRUE"/"FALSE"
+        self._set_validated("OUTPUT_FILE", "TRUE" if value else "FALSE")
 
     def set_output_file_format(self, value: str) -> None:
         """
@@ -200,6 +261,175 @@ class InputType:
             raise ValueError("Invalid output file path. Must be a non-empty string.")
         configGenerator.setParameter("OUTPUT_FILE_PATH", value, self.parameters)
         logger.debug("OUTPUT_FILE_PATH set to %r", value)
+
+
+    def set_output_html_rk_per_file(self, value: int) -> None:
+        """
+        Define the number of ranked lists per generated HTML file.
+
+        Args:
+            value (int): positive integer number of ranked lists per file.
+
+        Raises:
+            ValueError: if value is not a positive integer.
+        """
+        if not isinstance(value, int) or value <= 0:
+            raise ValueError("Invalid OUTPUT_HTML_RK_PER_FILE. Must be a positive integer.")
+        self._set_validated("OUTPUT_HTML_RK_PER_FILE", value)
+
+    def set_output_html_rk_size(self, value: int) -> None:
+        """
+        Define the number of images per ranked list in the generated HTML.
+
+        Args:
+            value (int): positive integer, number of images per ranked list.
+
+        Raises:
+            ValueError: if value is not a positive integer.
+        """
+        if not isinstance(value, int) or value <= 0:
+            raise ValueError("Invalid OUTPUT_HTML_RK_SIZE. Must be a positive integer.")
+        self._set_validated("OUTPUT_HTML_RK_SIZE", value)
+
+    def set_output_html_rk_colors(self, value: bool) -> None:
+        """
+        Enable or disable colored highlighting in HTML ranked lists.
+
+        Args:
+            value (bool): True to use colors, False otherwise.
+
+        Raises:
+            ValueError: if value is not boolean.
+        """
+        if not isinstance(value, bool):
+            raise ValueError("Invalid OUTPUT_HTML_RK_COLORS. Must be True or False.")
+        self._set_validated("OUTPUT_HTML_RK_COLORS", "TRUE" if value else "FALSE")
+
+    def set_output_html_rk_before_after(self, value: bool) -> None:
+        """
+        Enable or disable showing ranked lists before and after execution in HTML output.
+
+        Args:
+            value (bool): True to show before/after, False otherwise.
+
+        Raises:
+            ValueError: if value is not boolean.
+        """
+        if not isinstance(value, bool):
+            raise ValueError("Invalid OUTPUT_HTML_RK_BEFORE_AFTER. Must be True or False.")
+        self._set_validated("OUTPUT_HTML_RK_BEFORE_AFTER", "TRUE" if value else "FALSE")
+
+    def set_efficiency_eval(self, value: bool) -> None:
+        """
+        Enable or disable efficiency evaluation.
+
+        Args:
+            value (bool): True to enable, False to disable.
+
+        Raises:
+            ValueError: if value is not boolean.
+        """
+        if not isinstance(value, bool):
+            raise ValueError("Invalid EFFICIENCY_EVAL. Must be True or False.")
+        self._set_validated("EFFICIENCY_EVAL", "TRUE" if value else "FALSE")
+
+    def set_effectiveness_eval(self, value: bool) -> None:
+        """
+        Enable or disable effectiveness evaluation.
+
+        Args:
+            value (bool): True to enable, False to disable.
+
+        Raises:
+            ValueError: if value is not boolean.
+        """
+        if not isinstance(value, bool):
+            raise ValueError("Invalid EFFECTIVENESS_EVAL. Must be True or False.")
+        self._set_validated("EFFECTIVENESS_EVAL", "TRUE" if value else "FALSE")
+
+    def set_effectiveness_compute_precisions(self, value: bool) -> None:
+        """
+        Enable or disable computation of precision values.
+
+        Args:
+            value (bool): True to enable, False to disable.
+
+        Raises:
+            ValueError: if value is not boolean.
+        """
+        if not isinstance(value, bool):
+            raise ValueError("Invalid EFFECTIVENESS_COMPUTE_PRECISIONS. Must be True or False.")
+        self._set_validated("EFFECTIVENESS_COMPUTE_PRECISIONS", "TRUE" if value else "FALSE")
+
+    def set_effectiveness_compute_map(self, value: bool) -> None:
+        """
+        Enable or disable computation of MAP (Mean Average Precision).
+
+        Args:
+            value (bool): True to enable, False to disable.
+
+        Raises:
+            ValueError: if value is not boolean.
+        """
+        if not isinstance(value, bool):
+            raise ValueError("Invalid EFFECTIVENESS_COMPUTE_MAP. Must be True or False.")
+        self._set_validated("EFFECTIVENESS_COMPUTE_MAP", "TRUE" if value else "FALSE")
+
+    def set_effectiveness_compute_recall(self, value: bool) -> None:
+        """
+        Enable or disable computation of Recall values.
+
+        Args:
+            value (bool): True to enable, False to disable.
+
+        Raises:
+            ValueError: if value is not boolean.
+        """
+        if not isinstance(value, bool):
+            raise ValueError("Invalid EFFECTIVENESS_COMPUTE_RECALL. Must be True or False.")
+        self._set_validated("EFFECTIVENESS_COMPUTE_RECALL", "TRUE" if value else "FALSE")
+
+    def set_effectiveness_recalls_to_compute(self, values: list[int]) -> None:
+        """
+        Define which recall values should be computed.
+
+        Args:
+            values (list[int]): list of positive integers (e.g., [1, 2, 5, 10, 15]).
+
+        Raises:
+            ValueError: if list is empty or contains non-positive integers.
+        """
+        if (
+            not isinstance(values, list)
+            or not values
+            or not all(isinstance(v, int) and v > 0 for v in values)
+        ):
+            raise ValueError(
+                "Invalid EFFECTIVENESS_RECALLS_TO_COMPUTE. Must be a non-empty list of positive integers."
+            )
+        value_str = ",".join(str(v) for v in values)
+        self._set_validated("EFFECTIVENESS_RECALLS_TO_COMPUTE", value_str)
+
+    def set_effectiveness_precisions_to_compute(self, values: list[int]) -> None:
+        """
+        Define which precision values should be computed.
+
+        Args:
+            values (list[int]): list of positive integers (e.g., [1, 2, 5, 10, 15]).
+
+        Raises:
+            ValueError: if list is empty or contains non-positive integers.
+        """
+        if (
+            not isinstance(values, list)
+            or not values
+            or not all(isinstance(v, int) and v > 0 for v in values)
+        ):
+            raise ValueError(
+                "Invalid EFFECTIVENESS_PRECISIONS_TO_COMPUTE. Must be a non-empty list of positive integers."
+            )
+        value_str = ",".join(str(v) for v in values)
+        self._set_validated("EFFECTIVENESS_PRECISIONS_TO_COMPUTE", value_str)
 
 
     def set_rk_format(self, value: str) -> None:
@@ -309,7 +539,6 @@ class InputType:
         if not isinstance(value, str) or not value.strip():
             raise ValueError("Invalid lists file path. Must be a non-empty string.")
         self._set_validated("INPUT_FILE_LIST", value)
-
 
     def set_classes_file(self, value: str) -> None:
         """

@@ -1,86 +1,166 @@
-from turtle import shape
-from pyUDLF.utils import readData
-from PIL import Image, ImageDraw
-import numpy as np
 import os
+from pathlib import Path
+from typing import Optional, List, Union
 
-# ler no config o metodo numerico ou str do rk
+import numpy as np
+from PIL import Image, ImageDraw
 
+from pyUDLF.utils import readData
+from pyUDLF.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 class OutputType:
     """
-    Class to handle the outputs
+    Handle outputs produced by UDLF (matrix, ranked lists, logs, visualizations).
     """
 
-    def __init__(self, nome=None):
+    def __init__(self, path: Optional[str] = None) -> None:
         """
-        Initial class parameters.
+        Initialize OutputType with optional base path.
+        
+        Args:
+            path (str, optional): Base path for outputs (rk, matrix, log, etc.).
         """
-        # dictionary with log data
-        self.log_dict = dict()
-        self.rk_path = nome
-        self.matrix_path = nome
-        self.log_path = nome
-        self.individual_gain_list = []
-        self.images_path = nome
-        self.list_path = nome
-        self.classes_path = nome
+        self.log_dict: dict = {}
+        self.rk_path: Optional[str] = path
+        self.matrix_path: Optional[str] = path
+        self.log_path: Optional[str] = path
+        self.individual_gain_list: list = []
+        self.images_path: Optional[str] = path
+        self.list_path: Optional[str] = path
+        self.classes_path: Optional[str] = path
 
-    def get_matrix(self):
+        logger.debug("OutputType initialized with base path: %r", path)
+
+    def get_matrix(self) -> List[List[float]]:
         """
-        Read matrix file
+        Read the matrix output file and return it as a list of lists.
 
-        Parameters:
-            matrix_path -> matrix path
+        Returns:
+            List[List[float]]: matrix of floats.
 
-        Return:
-            returns a matrix
+        Raises:
+            FileNotFoundError: if matrix_path is not set or file does not exist.
+            ValueError: if the file contents cannot be parsed as floats.
         """
-        if self.matrix_path is None:
-            print("The shape of the output is not matrix!")
-            return None
+        if not self.matrix_path:
+            logger.error("Matrix path not set. The output is not a matrix.")
+            raise FileNotFoundError("Matrix path not set.")
 
-        matrix = readData.read_matrix_file(self.matrix_path)
-        return matrix
+        p = Path(self.matrix_path)
+        if not p.is_file():
+            logger.error("Matrix file not found: %s", self.matrix_path)
+            raise FileNotFoundError(f"Matrix file not found: {self.matrix_path}")
 
-    def get_rks(self, top_k=1000):
-        """
-        Read string ou numeric ranked list
-
-        Parameters:
-            rk_patk -> ranked list path
-
-        Return:
-            returns a ranked list with image numbers or names
-        """
-        if self.rk_path is None:
-            print("The shape of the output is not RK!")
-            return None
-
-        rks = readData.read_ranked_lists_file_string(self.rk_path, top_k=top_k)
         try:
-            rks = [[int(elem) for elem in rk] for rk in rks]
-        finally:
+            matrix = readData.read_matrix_file(self.matrix_path)
+            logger.debug(
+                "Matrix read from %s (shape: %dx%d)",
+                self.matrix_path,
+                len(matrix),
+                len(matrix[0]) if matrix else 0,
+            )
+            return matrix
+        except Exception as e:
+            logger.exception("Failed to read matrix file %s: %s", self.matrix_path, e)
+            raise ValueError(f"Failed to parse matrix file {self.matrix_path}: {e}")
+
+    def get_rks(
+        self, top_k: int = 1000, expect_numeric: Optional[bool] = None
+    ) -> List[List[Union[int, str]]]:
+        """
+        Read ranked lists (RK) from file.
+
+        Args:
+            top_k (int): Limit each ranked list to the top-k elements. Default=1000.
+            expect_numeric (Optional[bool]):
+                - True: force conversion to int (raise error if fails).
+                - False: keep strings.
+                - None: try to convert, fallback to strings.
+
+        Returns:
+            List[List[int]] if numeric, or List[List[str]] if string.
+
+        Raises:
+            FileNotFoundError: if rk_path is not set or file does not exist.
+            ValueError: if forced numeric conversion fails.
+        """
+        if not self.rk_path:
+            logger.error("RK path not set. The output is not RK.")
+            raise FileNotFoundError("RK path not set.")
+
+        p = Path(self.rk_path)
+        if not p.is_file():
+            logger.error("Ranked list file not found: %s", self.rk_path)
+            raise FileNotFoundError(f"Ranked list file not found: {self.rk_path}")
+
+        try:
+            rks = readData.read_ranked_lists_file_string(self.rk_path, top_k=top_k)
+        except Exception as e:
+            logger.exception("Failed to read ranked list file %s: %s", self.rk_path, e)
+            raise ValueError(f"Failed to read ranked list file {self.rk_path}: {e}")
+
+        # force numeric
+        if expect_numeric is True:
+            try:
+                return [[int(elem) for elem in rk] for rk in rks]
+            except Exception as e:
+                logger.exception("Forced numeric conversion failed: %s", e)
+                raise ValueError(
+                    f"Numeric conversion failed for ranked list file {self.rk_path}: {e}"
+                )
+
+        # force string
+        if expect_numeric is False:
             return rks
 
-    def get_log(self):
-        """
-        Returns the result of the execution !
-        """
-        if self.log_path is None:
-            print("Output was not requested at execution! Log does not exist!")
-            return None
+        # auto-detect (try convert, fallback)
+        try:
+            return [[int(elem) for elem in rk] for rk in rks]
+        except Exception:
+            logger.debug("Ranked lists contain non-numeric entries; returning as strings.")
+            return rks
 
-        #self.log_dict = readData.read_log(self.log_path)
-        # for param in self.log_dict:
-        #    print("{} = {}".format(param, self.log_dict[param])) return ou nao?
+
+    def get_log(self) -> dict:
+        """
+        Get the execution log dictionary.
+
+        Returns:
+            dict: execution log with metrics and parameters.
+
+        Raises:
+            FileNotFoundError: if log_path is not set or file does not exist.
+        """
+        if not self.log_path:
+            logger.error("Log path not set. Output was not requested at execution.")
+            raise FileNotFoundError("Log path not set. Output does not exist.")
+
+        p = Path(self.log_path)
+        if not p.is_file():
+            logger.error("Log file not found: %s", self.log_path)
+            raise FileNotFoundError(f"Log file not found: {self.log_path}")
+
+        if not self.log_dict:
+            try:
+                self.log_dict = readData.read_log(self.log_path)
+                logger.debug("Log loaded successfully from %s", self.log_path)
+            except Exception as e:
+                logger.exception("Failed to read log file %s: %s", self.log_path, e)
+                raise ValueError(f"Failed to read log file {self.log_path}: {e}")
 
         return self.log_dict
-        # original n tinha nada
 
-    def get_individual_gain_list(self):
-        # print(self.get_individual_gain_list)
+    def get_individual_gain_list(self) -> list:
+        """
+        Get the individual gain list.
+
+        Returns:
+            list: gain values for each individual element.
+        """
         return self.individual_gain_list
+
 
     def print_log(self, log_value=None):
         """

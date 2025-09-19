@@ -251,53 +251,6 @@ def run_platform(config_file: str, bin_path: str):
 
     return run_ok, path_log_out
 
-
-# def verify_running(path: str) -> bool:
-#     """
-#     Check a log file for error keywords or warning messages.
-
-#     Args:
-#         path (str): Path to the log file.
-
-#     Returns:
-#         bool: True if any error (excluding "warning") is found, False otherwise.
-#     """
-#     error_flag = False
-#     error_keywords = [
-#         "invalid",
-#         "error",
-#         "can't",
-#         "failed",
-#         "failure",
-#         "exception",
-#         "traceback",
-#         "not found",
-#         "critical"
-#     ]
-
-#     try:
-#         with open(path, "r", encoding="utf-8") as file:
-#             for line in file:
-#                 lowercase_line = line.lower()
-                
-#                 # Check for errors
-#                 for keyword in error_keywords:
-#                     if keyword in lowercase_line:
-#                         logger.error(f"[LOG ERROR] {line.strip()}")
-#                         error_flag = True
-#                         break  # avoid duplicate logging if multiple keywords match
-                
-#                 # Check for warnings
-#                 if "warning" in lowercase_line:
-#                     logger.warning(f"[LOG WARNING] {line.strip()}")
-#     except FileNotFoundError:
-#         logger.error(f"Log file not found: {path}")
-#         return True#True  # treat as error
-#     except Exception as e:
-#         logger.error(f"Unexpected error while verifying log file {path}: {e}")
-#         return True  # treat as error
-
-#     return error_flag
 def verify_running(path: str) -> bool:
     """
     Check a log file for error keywords or warning messages.

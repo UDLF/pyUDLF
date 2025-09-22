@@ -138,6 +138,86 @@ VALIDATIONS = {
     # Paths: PARAM_RFE_EMBEDDINGS_PATH, PARAM_RFE_CCS_PATH → free strings
 }
 
+# parameters map for each method
+METHOD_PARAMS = {
+    "CONTEXTRR": {
+        "l":   {"param": "PARAM_CONTEXTRR_L", "default": 25, "type": int},
+        "k":   {"param": "PARAM_CONTEXTRR_K", "default": 7, "type": int},
+        "t":   {"param": "PARAM_CONTEXTRR_T", "default": 5, "type": int},
+        "nbyk": {"param": "PARAM_CONTEXTRR_NBYK", "default": 1, "type": int},
+        "optimizations": {"param": "PARAM_CONTEXTRR_OPTIMIZATIONS", "default": True, "type": bool},
+    },
+    "CORGRAPH": {
+        "l":   {"param": "PARAM_CORGRAPH_L", "default": 200, "type": int},
+        "k":   {"param": "PARAM_CORGRAPH_K", "default": 25, "type": int},
+        "threshold_start": {"param": "PARAM_CORGRAPH_THRESHOLD_START", "default": 0.35, "type": float},
+        "threshold_end": {"param": "PARAM_CORGRAPH_THRESHOLD_END", "default": 1.0, "type": float},
+        "threshold_inc": {"param": "PARAM_CORGRAPH_THRESHOLD_INC", "default": 0.005, "type": float},
+        "correlation": {"param": "PARAM_CORGRAPH_CORRELATION", "default": "PEARSON", "type": str},
+    },
+    "CPRR": {
+        "l": {"param": "PARAM_CPRR_L", "default": 400, "type": int},
+        "k": {"param": "PARAM_CPRR_K", "default": 20, "type": int},
+        "t": {"param": "PARAM_CPRR_T", "default": 2, "type": int},
+    },
+    "RKGRAPH": {
+        "k": {"param": "PARAM_RKGRAPH_K", "default": 20, "type": int},
+        "t": {"param": "PARAM_RKGRAPH_T", "default": 1, "type": int},
+        "p": {"param": "PARAM_RKGRAPH_P", "default": 0.95, "type": float},
+        "l": {"param": "PARAM_RKGRAPH_L", "default": 700, "type": int},
+    },
+    "RECKNNGRAPH": {
+        "l": {"param": "PARAM_RECKNNGRAPH_L", "default": 200, "type": int},
+        "k": {"param": "PARAM_RECKNNGRAPH_K", "default": 15, "type": int},
+        "epsilon": {"param": "PARAM_RECKNNGRAPH_EPSILON", "default": 0.0125, "type": float},
+    },
+    "RLRECOM": {
+        "l": {"param": "PARAM_RLRECOM_L", "default": 400, "type": int},
+        "k": {"param": "PARAM_RLRECOM_K", "default": 8, "type": int},
+        "lambda": {"param": "PARAM_RLRECOM_LAMBDA", "default": 2.0, "type": float},
+        "epsilon": {"param": "PARAM_RLRECOM_EPSILON", "default": 0.0125, "type": float},
+    },
+    "RLSIM": {
+        "topk": {"param": "PARAM_RLSIM_TOPK", "default": 15, "type": int},
+        "ck": {"param": "PARAM_RLSIM_CK", "default": 700, "type": int},
+        "t": {"param": "PARAM_RLSIM_T", "default": 3, "type": int},
+        "metric": {"param": "PARAM_RLSIM_METRIC", "default": "INTERSECTION", "type": str},
+    },
+    "LHRR": {
+        "k": {"param": "PARAM_LHRR_K", "default": 18, "type": int},
+        "l": {"param": "PARAM_LHRR_L", "default": 1400, "type": int},
+        "t": {"param": "PARAM_LHRR_T", "default": 2, "type": int},
+    },
+    "BFSTREE": {
+        "l": {"param": "PARAM_BFSTREE_L", "default": 1400, "type": int},
+        "k": {"param": "PARAM_BFSTREE_K", "default": 20, "type": int},
+        "correlation_metric": {"param": "PARAM_BFSTREE_CORRELATION_METRIC", "default": "RBO", "type": str},
+    },
+    "RDPAC": {
+        "k_end": {"param": "PARAM_RDPAC_K_END", "default": 15, "type": int},
+        "k_inc": {"param": "PARAM_RDPAC_K_INC", "default": 1, "type": int},
+        "k_start": {"param": "PARAM_RDPAC_K_START", "default": 1, "type": int},
+        "l": {"param": "PARAM_RDPAC_L", "default": 400, "type": int},
+        "l_mult": {"param": "PARAM_RDPAC_L_MULT", "default": 2, "type": int},
+        "p": {"param": "PARAM_RDPAC_P", "default": 0.60, "type": float},
+        "pl": {"param": "PARAM_RDPAC_PL", "default": 0.99, "type": float},
+    },
+    "RFE": {
+        "k": {"param": "PARAM_RFE_K", "default": 20, "type": int},
+        "t": {"param": "PARAM_RFE_T", "default": 2, "type": int},
+        "l": {"param": "PARAM_RFE_L", "default": 400, "type": int},
+        "pa": {"param": "PARAM_RFE_PA", "default": 0.1, "type": float},
+        "th_cc": {"param": "PARAM_RFE_TH_CC", "default": 0, "type": int},
+        "rerank_by_emb": {"param": "PARAM_RFE_RERANK_BY_EMB", "default": False, "type": bool},
+        "export_embeddings": {"param": "PARAM_RFE_EXPORT_EMBEDDINGS", "default": False, "type": bool},
+        "perform_ccs": {"param": "PARAM_RFE_PERFORM_CCS", "default": True, "type": bool},
+        "embeddings_path": {"param": "PARAM_RFE_EMBEDDINGS_PATH", "default": "embeddings.txt", "type": str},
+        "ccs_path": {"param": "PARAM_RFE_CCS_PATH", "default": "ccs.txt", "type": str},
+    },
+}
+
+
+
 def validate_param(key: str, value):
     """
     Validate a parameter based on VALIDATIONS rules.

@@ -2,7 +2,7 @@ import os
 from pyUDLF.utils import configGenerator
 from pyUDLF import run_calls
 from pyUDLF.utils.logger import get_logger
-from pyUDLF.utils.validations import validate_param, validate_path
+from pyUDLF.utils.validations import validate_param, validate_path, METHOD_PARAMS
 
 logger = get_logger(__name__)
 
@@ -674,6 +674,85 @@ class InputType:
         if not isinstance(param, str) or not param.strip():
             raise ValueError("Parameter name must be a non-empty string.")
         configGenerator.setParameter(param, value, self.parameters)
+        
+    # def set_method_parameters(self, method: str, **kwargs) -> None:
+    #     """
+    #     Set multiple parameters for a specific method in one call.
+
+    #     Args:
+    #         method (str): name of the method (e.g., "CPRR").
+    #         **kwargs: key-value pairs of method parameters.
+
+    #     Raises:
+    #         ValueError: if method is not supported or invalid parameter names are provided.
+    #     """
+    #     method = method.upper()
+    #     if method not in METHOD_PARAMS:
+    #         raise ValueError(f"Unsupported method: {method}")
+
+    #     param_map = METHOD_PARAMS[method]
+
+    #     for key, value in kwargs.items():
+    #         if key not in param_map:
+    #             raise ValueError(
+    #                 f"Invalid parameter '{key}' for method {method}. "
+    #                 f"Allowed: {list(param_map.keys())}"
+    #             )
+    #         param_name = param_map[key]
+    #         self._set_validated(param_name, value)
+
+    #     logger.debug("Parameters for method %s set: %r", method, kwargs)
+    
+    def set_method_parameters(self, method: str, **kwargs) -> None:
+        """
+        Set multiple parameters for a specific UDLF method in one call.
+
+        This function allows configuring all parameters related to a given method
+        (e.g., CPRR, RFE, RDPAC) at once. Missing parameters are automatically
+        filled with their default values, as defined in METHOD_PARAMS.
+
+        Args:
+            method (str): the method name (e.g., "CPRR", "RFE", "RDPAC").
+            **kwargs: key-value pairs of parameters specific to the method.
+                The keys must match the shorthand names defined in METHOD_PARAMS.
+
+                Example:
+                    set_method_parameters("CPRR", k=10, alpha=0.5)
+
+        Raises:
+            ValueError: if the method is not supported, or if an invalid parameter
+                        name is provided in kwargs.
+        """
+        method = method.upper()
+        if method not in METHOD_PARAMS:
+            raise ValueError(f"Unsupported method: {method}")
+
+        param_map = METHOD_PARAMS[method]
+
+        # for key, spec in param_map.items():
+        #     if key in kwargs:
+        #         value = kwargs[key]
+        #     else:
+        #         value = spec.get("default")
+        #     self._set_validated(spec["param"], value)
+        for key, spec in param_map.items():
+            if key in kwargs:
+                value = kwargs[key]
+            else:
+                value = spec.get("default")
+
+            # type verification
+            expected_type = spec.get("type")
+            if expected_type is not None and not isinstance(value, expected_type):
+                raise ValueError(
+                    f"Invalid type for parameter '{key}' in method {method}. "
+                    f"Expected {expected_type.__name__}, got {type(value).__name__}."
+                )
+
+            self._set_validated(spec["param"], value)
+
+        logger.debug("Parameters for method %s set: %r", method, kwargs)
+
 
     def get_param(self, param: str):
         """

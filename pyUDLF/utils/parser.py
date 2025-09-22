@@ -33,7 +33,8 @@ def parse_config(config_file: str) -> dict:
         "after_path": "",
         "rk_path": "",
         "matrix_path": "",
-        "log_path": ""
+        "log_path": "",
+        "images_path":""
     }
     with open(config_file, "r") as f:
         lines = [line.strip() for line in f if line.strip()]
@@ -50,6 +51,9 @@ def parse_config(config_file: str) -> dict:
 
         elif line.startswith("INPUT_FILE_CLASSES"):
             params["classes_path"] = line.split("=")[1].split("#")[0].strip()
+
+        elif line.startswith("INPUT_IMAGES_PATH"):
+            params["images_path"] = line.split("=")[1].split("#")[0].strip()
 
         elif line.startswith("INPUT_FILE_FORMAT"):
             params["in_file_format"] = line.split("=")[1].split("#")[0].strip()

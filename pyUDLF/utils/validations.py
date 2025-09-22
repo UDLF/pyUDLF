@@ -4,6 +4,7 @@ Generated from config.ini specification.
 """
 
 from pyUDLF.utils.logger import get_logger
+from pathlib import Path
 
 logger = get_logger(__name__)
 
@@ -198,3 +199,40 @@ def validate_param(key: str, value):
         raise ValueError(f"Invalid value '{value}' for {key}. Must be list of unsigned integers.")
 
     return value
+
+from pathlib import Path
+
+def validate_path(value: str, must_exist: bool = False) -> str:
+    """
+    Validate a file or directory path.
+
+    Args:
+        value (str): the path to validate.
+        must_exist (bool): if True, check that the path exists.
+
+    Returns:
+        str: the validated path.
+
+    Raises:
+        ValueError: if path is invalid, contains spaces/special characters,
+                    or does not exist when must_exist=True.
+    """
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("Path must be a non-empty string.")
+
+    # Normalize
+    path_str = value.strip()
+    path = Path(path_str)
+
+    # Basic forbidden characters (expand if needed)
+    forbidden = [' ', '(', ')', '[', ']', '{', '}', ';', '"', "'"]
+    if any(ch in path_str for ch in forbidden):
+        raise ValueError(
+            f"Invalid path '{path_str}'. It contains spaces or forbidden characters."
+        )
+
+    # Optional existence check
+    if must_exist and not path.exists():
+        raise ValueError(f"Path does not exist: {path_str}")
+
+    return path_str

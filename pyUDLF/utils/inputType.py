@@ -2,7 +2,7 @@ import os
 from pyUDLF.utils import configGenerator
 from pyUDLF import run_calls
 from pyUDLF.utils.logger import get_logger
-from pyUDLF.utils.validations import validate_param
+from pyUDLF.utils.validations import validate_param, validate_path
 
 logger = get_logger(__name__)
 
@@ -199,9 +199,10 @@ class InputType:
         Raises:
             ValueError: if value is not a non-empty string.
         """
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError("Invalid input file path. Must be a non-empty string.")
-        self._set_validated("INPUT_FILE", value)
+        # if not isinstance(value, str) or not value.strip():
+        #     raise ValueError("Invalid input file path. Must be a non-empty string.")
+        path_str = validate_path(value, must_exist=True)
+        self._set_validated("INPUT_FILE", path_str)
 
     def set_output_file(self, value: bool) -> None:
         """
@@ -257,10 +258,12 @@ class InputType:
         Args:
             value (str): path to the output (base name, without extension).
         """
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError("Invalid output file path. Must be a non-empty string.")
-        configGenerator.setParameter("OUTPUT_FILE_PATH", value, self.parameters)
-        logger.debug("OUTPUT_FILE_PATH set to %r", value)
+        # if not isinstance(value, str) or not value.strip():
+        #     raise ValueError("Invalid output file path. Must be a non-empty string.")
+        # configGenerator.setParameter("OUTPUT_FILE_PATH", value, self.parameters)
+        # logger.debug("OUTPUT_FILE_PATH set to %r", value)
+        path_str = validate_path(value, must_exist=False)
+        self._set_validated("OUTPUT_FILE_PATH", path_str)
 
 
     def set_output_html_rk_per_file(self, value: int) -> None:
@@ -463,6 +466,41 @@ class InputType:
         self._set_validated("MATRIX_TO_RK_SORTING", value)
 
     
+    # def set_input_files(self, value):
+    #     """
+    #     Set the input files.
+
+    #     Accepts:
+    #         - str: path to a single file.
+    #         - list[str]: multiple file paths (fusion).
+    #         - list[list]: ranked lists to be written to disk.
+
+    #     Raises:
+    #         TypeError: if value type is unsupported.
+    #     """
+    #     if not isinstance(value, (str, list)):
+    #         raise TypeError(
+    #             f"Invalid input type for set_input_files: {type(value)}. "
+    #             "Must be str, list[str], or list[list]."
+    #         )
+
+    #     self.input_files_list = value
+
+    #     if isinstance(value, list):
+    #         if len(value) == 0:
+    #             raise ValueError("Input file list cannot be empty.")
+
+    #         if isinstance(value[0], list):
+    #             aux = os.path.dirname(self.config_path)
+    #             data_paths = configGenerator.write_input_files(self.input_files_list, aux)
+    #             self.set_input_files(data_paths)
+    #             return
+
+    #         if not all(isinstance(elem, str) for elem in value):
+    #             raise TypeError("All elements of input_files_list must be strings.")
+
+    #     configGenerator.set_input(value, self.parameters, self.list_parameters)
+   
     def set_input_files(self, value):
         """
         Set the input files.
@@ -474,6 +512,7 @@ class InputType:
 
         Raises:
             TypeError: if value type is unsupported.
+            ValueError: if list is empty or contains invalid paths.
         """
         if not isinstance(value, (str, list)):
             raise TypeError(
@@ -483,20 +522,32 @@ class InputType:
 
         self.input_files_list = value
 
+        # Case 1: list input
         if isinstance(value, list):
             if len(value) == 0:
                 raise ValueError("Input file list cannot be empty.")
 
+            # Case 1a: list of lists -> write them as files first
             if isinstance(value[0], list):
                 aux = os.path.dirname(self.config_path)
                 data_paths = configGenerator.write_input_files(self.input_files_list, aux)
                 self.set_input_files(data_paths)
                 return
 
+            # Case 1b: list of strings -> validate each path
             if not all(isinstance(elem, str) for elem in value):
                 raise TypeError("All elements of input_files_list must be strings.")
 
+            for elem in value:
+                validate_path(elem, must_exist=True)
+
+        # Case 2: single string -> validate directly
+        if isinstance(value, str):
+            validate_path(value, must_exist=True)
+
+        # Delegate to configGenerator (it will set UDL_TASK and INPUT_FILE_FORMAT)
         configGenerator.set_input(value, self.parameters, self.list_parameters)
+   
     
     def set_ranked_lists_size(self, value):
         """
@@ -536,9 +587,11 @@ class InputType:
         Args:
             value (str): path to the file list.
         """
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError("Invalid lists file path. Must be a non-empty string.")
-        self._set_validated("INPUT_FILE_LIST", value)
+        # if not isinstance(value, str) or not value.strip():
+        #     raise ValueError("Invalid lists file path. Must be a non-empty string.")
+        # self._set_validated("INPUT_FILE_LIST", value)
+        path_str = validate_path(value, must_exist=True)
+        self._set_validated("INPUT_FILE_LIST", path_str)
 
     def set_classes_file(self, value: str) -> None:
         """
@@ -547,20 +600,25 @@ class InputType:
         Args:
             value (str): path to the classes file.
         """
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError("Invalid classes file path. Must be a non-empty string.")
-        self._set_validated("INPUT_FILE_CLASSES", value)
+        # if not isinstance(value, str) or not value.strip():
+        #     raise ValueError("Invalid classes file path. Must be a non-empty string.")
+        # self._set_validated("INPUT_FILE_CLASSES", value)
+        path_str = validate_path(value, must_exist=True)
+        self._set_validated("INPUT_FILE_CLASSES", path_str)
 
-    def set_output_log_file(self, value: str) -> None:
+    def set_output_log_file_path(self, value: str) -> None:
         """
         Set the path of the output log.
 
         Args:
             value (str): path to the log file.
         """
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError("Invalid log file path. Must be a non-empty string.")
-        self._set_validated("OUTPUT_LOG_FILE_PATH", value)
+        # if not isinstance(value, str) or not value.strip():
+        #     raise ValueError("Invalid log file path. Must be a non-empty string.")
+        # self._set_validated("OUTPUT_LOG_FILE_PATH", value)
+        path_str = validate_path(value, must_exist=False)
+        self._set_validated("OUTPUT_LOG_FILE_PATH", path_str)
+        
 
     def add_new_parameter(self, param: str, value) -> None:
         """
@@ -599,9 +657,11 @@ class InputType:
         Args:
             value (str): path to the images directory.
         """
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError("Invalid images path. Must be a non-empty string.")
-        self._set_validated("INPUT_IMAGES_PATH", value)
+        # if not isinstance(value, str) or not value.strip():
+        #     raise ValueError("Invalid images path. Must be a non-empty string.")
+        # self._set_validated("INPUT_IMAGES_PATH", value)
+        path_str = validate_path(value, must_exist=True)
+        self._set_validated("INPUT_IMAGES_PATH", path_str)
 
     def set_param(self, param: str, value) -> None:
         """

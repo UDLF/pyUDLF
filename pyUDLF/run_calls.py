@@ -268,7 +268,8 @@ def verify_running(path: str) -> bool:
         "exception",
         "traceback",
         "not found",
-        "critical"
+        "critical",
+        "unable"
     ]
 
     try:

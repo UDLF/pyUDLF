@@ -649,7 +649,6 @@ class InputType:
             value, self.parameters, self.list_parameters
         )
 
- 
     def set_input_images_path(self, value: str) -> None:
         """
         Set the path to the input images.

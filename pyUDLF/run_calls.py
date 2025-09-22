@@ -2,7 +2,6 @@ import os
 import requests
 import tarfile
 import tempfile
-import logging
 from pathlib import Path
 import subprocess
 from pyUDLF.utils import readData, outputType, evaluation, parser
@@ -268,7 +267,10 @@ def verify_running(path: str) -> bool:
         "exception",
         "traceback",
         "not found",
-        "critical"
+        "critical",
+        "unable",
+        "denied",
+        
     ]
 
     try:

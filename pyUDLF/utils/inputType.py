@@ -934,7 +934,7 @@ class InputType:
         classes_path = self.get_classes_file()[0]
         images_path = self.get_input_images_path()[0]
 
-        print(rk_path, list_path, classes_path, images_path)
+        #print(rk_path, list_path, classes_path, images_path)
         # --- Validate presence and existence ---
         paths = {
             "INPUT_FILE (ranked list)": (rk_path, Path(rk_path).is_file() if rk_path else False),

@@ -371,6 +371,7 @@ def individual_gain_config_running(config_file: str, depth: int = -1):
         individual_gain_list = evaluation.compute_gain(
             rks_before, rks_after, classes_list, depth, measure="MAP", verbose=True)
         logger.info("Individual gain computation completed successfully.")
+        #print(individual_gain_list)
         return individual_gain_list
     except Exception as e:
         logger.error(f"Error computing individual gain: {e}")

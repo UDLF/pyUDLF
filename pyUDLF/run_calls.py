@@ -415,6 +415,8 @@ def prepare_visualization(params: dict, output: "OutputType") -> bool:
     out_format = params.get("out_file_format", "")
     out_rk_format = params.get("out_rk_format", "")
     img_path = params.get("images_path", "")
+    list_path = params.get("list_path", "")
+    classes_path = params.get("classes_path","")
 
     if out_format != "RK":
         logger.error("The output file must be of type 'RK'.")
@@ -425,11 +427,19 @@ def prepare_visualization(params: dict, output: "OutputType") -> bool:
     if not os.path.isdir(img_path):
         logger.warning(f"Images directory does not exist: {img_path}")
         return False
+    
+    if not os.path.isdir(list_path):
+        logger.warning(f"List file does not exist: {img_path}")
+        return False
+    
+    if not os.path.isdir(classes_path):
+        logger.warning(f"Classes file does not exist: {img_path}")
+        return False
 
     # If everything is valid, update output
     output.images_path = img_path
     output.list_path = params.get("list_path", "")
-    output.classes_path = params.get("classes_path", "")
+    output.classes_path = params.get("classes_path","")
     logger.info("Visualization paths set successfully.")
     return True
 
@@ -465,6 +475,9 @@ def runWithConfig(
             output.rk_path = params["rk_path"]
             output.matrix_path = params["matrix_path"]
             output.log_path = params["log_path"]
+            output.classes_path = params["classes_path"]
+            output.list_path = params["list_path"]
+            output.images_path = params["images_path"]
             output.log_dict = parser.parse_log_and_cleanup(log_out_path)
         except Exception as e:
             logger.error(f"Error parsing config file {config_file}: {e}")

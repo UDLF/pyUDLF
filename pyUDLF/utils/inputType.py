@@ -3,7 +3,8 @@ from pyUDLF.utils import configGenerator
 from pyUDLF import run_calls
 from pyUDLF.utils.logger import get_logger
 from pyUDLF.utils.validations import validate_param, validate_path, METHOD_PARAMS
-
+from pyUDLF.utils.visualization import render_ranked_list
+from pathlib import Path
 logger = get_logger(__name__)
 
 class InputType:
@@ -465,42 +466,6 @@ class InputType:
         """
         self._set_validated("MATRIX_TO_RK_SORTING", value)
 
-    
-    # def set_input_files(self, value):
-    #     """
-    #     Set the input files.
-
-    #     Accepts:
-    #         - str: path to a single file.
-    #         - list[str]: multiple file paths (fusion).
-    #         - list[list]: ranked lists to be written to disk.
-
-    #     Raises:
-    #         TypeError: if value type is unsupported.
-    #     """
-    #     if not isinstance(value, (str, list)):
-    #         raise TypeError(
-    #             f"Invalid input type for set_input_files: {type(value)}. "
-    #             "Must be str, list[str], or list[list]."
-    #         )
-
-    #     self.input_files_list = value
-
-    #     if isinstance(value, list):
-    #         if len(value) == 0:
-    #             raise ValueError("Input file list cannot be empty.")
-
-    #         if isinstance(value[0], list):
-    #             aux = os.path.dirname(self.config_path)
-    #             data_paths = configGenerator.write_input_files(self.input_files_list, aux)
-    #             self.set_input_files(data_paths)
-    #             return
-
-    #         if not all(isinstance(elem, str) for elem in value):
-    #             raise TypeError("All elements of input_files_list must be strings.")
-
-    #     configGenerator.set_input(value, self.parameters, self.list_parameters)
-   
     def set_input_files(self, value):
         """
         Set the input files.
@@ -600,9 +565,6 @@ class InputType:
         Args:
             value (str): path to the classes file.
         """
-        # if not isinstance(value, str) or not value.strip():
-        #     raise ValueError("Invalid classes file path. Must be a non-empty string.")
-        # self._set_validated("INPUT_FILE_CLASSES", value)
         path_str = validate_path(value, must_exist=True)
         self._set_validated("INPUT_FILE_CLASSES", path_str)
 
@@ -613,9 +575,6 @@ class InputType:
         Args:
             value (str): path to the log file.
         """
-        # if not isinstance(value, str) or not value.strip():
-        #     raise ValueError("Invalid log file path. Must be a non-empty string.")
-        # self._set_validated("OUTPUT_LOG_FILE_PATH", value)
         path_str = validate_path(value, must_exist=False)
         self._set_validated("OUTPUT_LOG_FILE_PATH", path_str)
         
@@ -656,9 +615,6 @@ class InputType:
         Args:
             value (str): path to the images directory.
         """
-        # if not isinstance(value, str) or not value.strip():
-        #     raise ValueError("Invalid images path. Must be a non-empty string.")
-        # self._set_validated("INPUT_IMAGES_PATH", value)
         path_str = validate_path(value, must_exist=True)
         self._set_validated("INPUT_IMAGES_PATH", path_str)
 
@@ -673,34 +629,6 @@ class InputType:
         if not isinstance(param, str) or not param.strip():
             raise ValueError("Parameter name must be a non-empty string.")
         configGenerator.setParameter(param, value, self.parameters)
-        
-    # def set_method_parameters(self, method: str, **kwargs) -> None:
-    #     """
-    #     Set multiple parameters for a specific method in one call.
-
-    #     Args:
-    #         method (str): name of the method (e.g., "CPRR").
-    #         **kwargs: key-value pairs of method parameters.
-
-    #     Raises:
-    #         ValueError: if method is not supported or invalid parameter names are provided.
-    #     """
-    #     method = method.upper()
-    #     if method not in METHOD_PARAMS:
-    #         raise ValueError(f"Unsupported method: {method}")
-
-    #     param_map = METHOD_PARAMS[method]
-
-    #     for key, value in kwargs.items():
-    #         if key not in param_map:
-    #             raise ValueError(
-    #                 f"Invalid parameter '{key}' for method {method}. "
-    #                 f"Allowed: {list(param_map.keys())}"
-    #             )
-    #         param_name = param_map[key]
-    #         self._set_validated(param_name, value)
-
-    #     logger.debug("Parameters for method %s set: %r", method, kwargs)
     
     def set_method_parameters(self, method: str, **kwargs) -> None:
         """
@@ -970,3 +898,113 @@ class InputType:
             str: path to the images directory.
         """
         return configGenerator.getParameter("INPUT_IMAGES_PATH", self.parameters)
+
+    def show_input_rk(self, line: int, rk_size: int = 10,
+                    images_shape: tuple[int, int] = (0, 0),
+                    start_element: int = 0,
+                    fusion_index: int = 1):
+        """
+        Show an input ranked list (before processing) as concatenated images.
+
+        Args:
+            line (int): line index in the ranked list file (query index).
+            rk_size (int): number of retrieved elements to show.
+            images_shape (tuple[int, int]): resize shape (w,h). If (0,0), use min size.
+            start_element (int): starting index offset for the ranked list.
+            fusion_index (int): index of fusion input file (only used when task=FUSION).
+
+        Returns:
+            PIL.Image.Image: the combined image for visualization.
+        """
+        # --- Detect task type ---
+        task = self.get_task()[0]
+
+        if task == "FUSION":
+            logger.warning(
+                "Task is set to FUSION. Showing ranked list from INPUT_FILES_FUSION_%d",
+                fusion_index,
+            )
+            rk_path = self.parameters.get(f"INPUT_FILES_FUSION_{fusion_index}")[0]
+            if rk_path is None:
+                raise ValueError(f"No fusion input file found for index {fusion_index}")
+        else:
+            rk_path = self.parameters.get("INPUT_FILE")[0]
+
+        list_path = self.get_lists_file()[0]
+        classes_path = self.get_classes_file()[0]
+        images_path = self.get_input_images_path()[0]
+
+        print(rk_path, list_path, classes_path, images_path)
+        # --- Validate presence and existence ---
+        paths = {
+            "INPUT_FILE (ranked list)": (rk_path, Path(rk_path).is_file() if rk_path else False),
+            "INPUT_FILE_LIST": (list_path, Path(list_path).is_file() if list_path else False),
+            "INPUT_FILE_CLASSES": (classes_path, Path(classes_path).is_file() if classes_path else False),
+            "INPUT_IMAGES_PATH": (images_path, Path(images_path).is_dir() if images_path else False),
+        }
+
+        for name, (p, exists) in paths.items():
+            if not p or not isinstance(p, str):
+                raise ValueError(f"{name} is not defined or not a valid string: {p}")
+            if not exists:
+                raise FileNotFoundError(f"{name} does not exist at: {p}")
+
+        return render_ranked_list(
+            rk_path=rk_path,
+            list_path=list_path,
+            classes_path=classes_path,
+            images_path=images_path,
+            line=line,
+            rk_size=rk_size,
+            images_shape=images_shape,
+            save=False,
+            start_element=start_element
+        )
+
+ 
+    # def show_input_rk(self, line: int, rk_size: int = 10,
+    #                 images_shape: tuple[int, int] = (0, 0),
+    #                 start_element: int = 0):
+    #     """
+    #     Show an input ranked list (before processing) as concatenated images.
+
+    #     Args:
+    #         line (int): line index in the ranked list file (query index).
+    #         rk_size (int): number of retrieved elements to show.
+    #         images_shape (tuple[int, int]): resize shape (w,h). If (0,0), use min size.
+    #         start_element (int): starting index offset for the ranked list.
+
+    #     Returns:
+    #         PIL.Image.Image: the combined image for visualization.
+    #     """
+    #     rk_path = self.parameters.get("INPUT_FILE")[0]
+    #     list_path = self.get_lists_file()[0]
+    #     classes_path = self.get_classes_file()[0]
+    #     images_path = self.get_input_images_path()[0]
+    #     print(rk_path, list_path, classes_path, images_path)
+
+    #     # --- Validate presence and existence ---
+    #     paths = {
+    #         "INPUT_FILE (ranked list)": (rk_path, Path(rk_path).is_file() if rk_path else False),
+    #         "INPUT_FILE_LIST": (list_path, Path(list_path).is_file() if list_path else False),
+    #         "INPUT_FILE_CLASSES": (classes_path, Path(classes_path).is_file() if classes_path else False),
+    #         "INPUT_IMAGES_PATH": (images_path, Path(images_path).is_dir() if images_path else False),
+    #     }
+
+    #     for name, (p, exists) in paths.items():
+    #         if not p or not isinstance(p, str):
+    #             raise ValueError(f"{name} is not defined or not a valid string: {p}")
+    #         if not exists:
+    #             raise FileNotFoundError(f"{name} does not exist at: {p}")
+
+    #     return render_ranked_list(
+    #         rk_path=rk_path,
+    #         list_path=list_path,
+    #         classes_path=classes_path,
+    #         images_path=images_path,
+    #         line=line,
+    #         rk_size=rk_size,
+    #         images_shape=images_shape,
+    #         save=False,
+    #         start_element=start_element
+    #     )

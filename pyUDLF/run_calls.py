@@ -411,18 +411,16 @@ def prepare_visualization(params: dict, output: "OutputType") -> bool:
     Returns:
         bool: True if visualization paths were set successfully, False otherwise.
     """
-    out_format = params.get("out_format", "")
+    out_format = params.get("out_file_format", "")
     out_rk_format = params.get("out_rk_format", "")
-    img_path = params.get("img_path", "")
+    img_path = params.get("images_path", "")
 
     if out_format != "RK":
         logger.error("The output file must be of type 'RK'.")
         return False
-
     if out_rk_format != "NUM":
         logger.error("The output format of the ranked lists must be 'NUM'.")
         return False
-
     if not os.path.isdir(img_path):
         logger.warning(f"Images directory does not exist: {img_path}")
         return False

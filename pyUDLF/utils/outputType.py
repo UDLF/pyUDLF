@@ -178,114 +178,260 @@ class OutputType:
                 for param in log_value:
                     print("{:<10} = {}".format(param, log_value[param]))
 
-    def show_rk(self, line, rk_size=10, images_shape=(0, 0), start_element=0):
-        return self.__internal_rk_images_use__(line, rk_size, images_shape=images_shape, start_element=start_element)
+    def show_rk(self, line: int, rk_size: int = 10,
+                images_shape: tuple[int, int] = (0, 0), start_element: int = 0):
+        """
+        Show a ranked list as concatenated images.
 
-    def save_rk_img(self, line, rk_size=10, images_shape=(0, 0), img_path="", start_element=0):
-        if not isinstance(img_path, str):
-            print("ERROR! Path must be of type string")
-            return
+        Args:
+            line (int): line index in the ranked list file (query index).
+            rk_size (int): number of retrieved elements to show.
+            images_shape (tuple[int, int]): resize shape (w,h). If (0,0), use smallest image.
+            start_element (int): starting index offset for the ranked list.
 
-        return self.__internal_rk_images_use__(line, rk_size, images_shape=images_shape, save=True, img_path=img_path, start_element=start_element)
+        Returns:
+            PIL.Image.Image: the combined image for visualization.
 
-    def __internal_rk_images_use__(self, line, rk_size=10, images_shape=(0, 0), save=False, img_path="", start_element=0):
-        min_shape = (0, 0)
+        Raises:
+            ValueError: if line is not a valid index.
+        """
+        if type(line) is not int or line < 0:
+            raise ValueError(f"line must be a non-negative integer, got {line!r}")
 
-        #################
-        if ((self.list_path is None) or (self.classes_path is None) or (self.images_path is None)):
-            print("Something is wrong. Unable to generate preview!")
-            return
-        ###############
-        classes_list = readData.read_classes(
-            self.list_path, self.classes_path)
-        # print(classes_list)
+        # Validate range inside _render_rk_images
+        return self._render_rk_images(
+            line, rk_size, images_shape=images_shape, save=False,
+            img_path="", start_element=start_element
+        )
 
-        if self.images_path is None:
-            print("Unable to generate preview, image path is empty!")
-            return
+    def save_rk_img(self, line: int, rk_size: int = 10,
+                    images_shape: tuple[int, int] = (0, 0),
+                    img_path: str = "", start_element: int = 0):
+        """
+        Save a ranked list as concatenated images.
 
-        f = open(self.rk_path)
-        all_lines = f.readlines()
-        f.close()
+        Args:
+            line (int): line index in the ranked list file (query index).
+            rk_size (int): number of retrieved elements to save.
+            images_shape (tuple[int, int]): resize shape (w,h). If (0,0), use smallest image.
+            img_path (str): path to save the output image.
+            start_element (int): starting index offset for the ranked list.
 
-        f = open(self.list_path)
-        list_test = [x.replace('\n', '') for x in f.readlines()]
-        f.close()
-        # print(list_test)
+        Returns:
+            Path: path to the saved image.
 
-        # rk line for show
+        Raises:
+            ValueError: if line is not a valid index or img_path is invalid.
+        """
+        if not isinstance(line, int) or line < 0:
+            raise ValueError(f"line must be a non-negative integer, got {line!r}")
+        if not isinstance(img_path, str) or not img_path.strip():
+            raise ValueError("img_path must be a non-empty string.")
+
+        return self._render_rk_images(
+            line, rk_size, images_shape=images_shape,
+            save=True, img_path=img_path, start_element=start_element
+        )
+
+
+    # def _render_rk_images(self, line: int, rk_size: int = 10,
+    #                       images_shape: tuple[int, int] = (0, 0),
+    #                       save: bool = False, img_path: str = "",
+    #                       start_element: int = 0):
+    #     """
+    #     Internal method to render ranked list images.
+
+    #     Adds blue border to query, green to correct matches,
+    #     and red to incorrect ones.
+
+    #     Returns:
+    #         PIL.Image.Image or Path: combined image, or saved path.
+    #     """
+    #     # Sanity check: paths must be defined
+    #     if not all((self.list_path, self.classes_path, self.images_path, self.rk_path)):
+    #         raise RuntimeError("Missing required paths. Cannot render ranked list.")
+
+    #     # Load classes
+    #     classes_list = readData.read_classes(self.list_path, self.classes_path)
+
+    #     # Load ranked lists (strings)
+    #     with open(self.rk_path, "r") as f:
+    #         all_lines = f.readlines()
+
+    #     if line >= len(all_lines):
+    #         raise ValueError(f"line index {line} out of range (0 - {len(all_lines)-1})")
+
+    #     # Load file list (image names)
+    #     with open(self.list_path, "r") as f:
+    #         list_test = [x.strip() for x in f.readlines()]
+
+    #     # Extract ranked list for the query line
+    #     only_one = all_lines[line].split()
+
+    #     # Build image paths and corresponding classes
+    #     images_class_list = []
+    #     images_show_list = []
+
+    #     # Add query (first element)
+    #     query_idx = int(only_one[0])
+    #     images_class_list.append(classes_list[query_idx])
+    #     images_show_list.append(str(Path(self.images_path) / list_test[query_idx]))
+
+    #     # Add retrieved results
+    #     for i in range(1, rk_size):
+    #         idx = int(only_one[i + start_element])
+    #         images_class_list.append(classes_list[idx])
+    #         images_show_list.append(str(Path(self.images_path) / list_test[idx]))
+
+    #     # Check file existence
+    #     for p in images_show_list:
+    #         if not Path(p).is_file():
+    #             raise FileNotFoundError(f"No such file: {p}")
+
+    #     # Open all images
+    #     imgs = [Image.open(p).convert("RGB") for p in images_show_list]
+
+    #     # Draw borders: blue for query, green/red for results
+    #     ImageDraw.Draw(imgs[0]).rectangle(
+    #         [(0, 0), (imgs[0].width, imgs[0].height)], outline="blue", width=10
+    #     )
+    #     for i in range(1, len(imgs)):
+    #         color = "green" if images_class_list[0] == images_class_list[i] else "red"
+    #         ImageDraw.Draw(imgs[i]).rectangle(
+    #             [(0, 0), (imgs[i].width, imgs[i].height)], outline=color, width=10
+    #         )
+
+    #     # Decide resize shape
+    #     if (
+    #         isinstance(images_shape, tuple)
+    #         and len(images_shape) == 2
+    #         and all(isinstance(x, int) for x in images_shape)
+    #     ):
+    #         if images_shape == (0, 0):
+    #             min_shape = sorted([(np.sum(i.size), i.size) for i in imgs])[0][1]
+    #         else:
+    #             min_shape = images_shape
+    #     else:
+    #         raise ValueError("images_shape must be (int, int), e.g., (128, 128).")
+
+    #     # Resize and concatenate horizontally
+    #     imgs_comb = np.concatenate(
+    #         [np.array(img.resize(min_shape)) for img in imgs], axis=1
+    #     )
+    #     imgs_comb = Image.fromarray(imgs_comb)
+
+    #     if save:
+    #         imgs_comb.save(img_path)
+    #         return Path(img_path)
+    #     else:
+    #         imgs_comb.show()
+    #         return imgs_comb
+
+    def _render_rk_images(self, line: int, rk_size: int = 10,
+                        images_shape: tuple[int, int] = (0, 0),
+                        save: bool = False, img_path: str = "",
+                        start_element: int = 0):
+        """
+        Internal method to render ranked list images.
+
+        Adds blue border to query, green to correct matches,
+        and red to incorrect ones.
+
+        Returns:
+            PIL.Image.Image or Path: combined image, or saved path.
+
+        Raises:
+            ValueError: if indices are invalid or ranked list is too short.
+            RuntimeError: if required paths are missing.
+        """
+        # --- Sanity check for paths ---
+        if not all((self.list_path, self.classes_path, self.images_path, self.rk_path)):
+            raise RuntimeError("Missing required paths. Cannot render ranked list.")
+
+        # --- Load classes ---
+        classes_list = readData.read_classes(self.list_path, self.classes_path)
+
+        # --- Load ranked lists (strings) ---
+        with open(self.rk_path, "r") as f:
+            all_lines = f.readlines()
+
+        if line >= len(all_lines):
+            raise ValueError(f"line index {line} out of range (max {len(all_lines)-1})")
+
         only_one = all_lines[line].split()
-        # print(only_one)
-        # print(classes_list[int(only_one[1])])
-        # taking images class
+        if not only_one:
+            raise ValueError(f"Ranked list at line {line} is empty.")
+
+        # --- Load file list (image names) ---
+        with open(self.list_path, "r") as f:
+            list_test = [x.strip() for x in f.readlines()]
+
+        # --- Check rk_size validity ---
+        if rk_size + start_element > len(only_one):
+            raise ValueError(
+                f"Requested rk_size={rk_size} with start_element={start_element}, "
+                f"but only {len(only_one)} elements available in ranked list."
+            )
+
+        # --- Build image paths and corresponding classes ---
         images_class_list = []
         images_show_list = []
 
-        # taking first element
-        images_class_list.append(classes_list[int(only_one[0])])
-        # print(only_one[i])
-        images_show_list.append(
-            self.images_path + list_test[int(only_one[0])])
-        if not os.path.isfile(images_show_list[0]):
-            print("No such file or directory: "+images_show_list[0])
-            return
+        for i in range(rk_size):
+            idx = int(only_one[i + start_element])
 
-        for i in range(1, rk_size):
-            j = i
-            i += start_element
+            if not (0 <= idx < len(classes_list)):
+                raise ValueError(f"Index {idx} out of range for classes_list (len={len(classes_list)}).")
+            if not (0 <= idx < len(list_test)):
+                raise ValueError(f"Index {idx} out of range for list_test (len={len(list_test)}).")
 
-            # taking images class
-            images_class_list.append(classes_list[int(only_one[i])])
-            # print(only_one[i])
-            images_show_list.append(
-                self.images_path + list_test[int(only_one[i])])
-            if not os.path.isfile(images_show_list[j]):
-                print("No such file or directory: "+images_show_list[j])
-                return
+            images_class_list.append(classes_list[idx])
+            images_show_list.append(str(Path(self.images_path) / list_test[idx]))
 
-        imgs = [Image.open(i).convert('RGB') for i in images_show_list]
-        # print(images_class_list)
-        ##########################
+        # --- Verify files exist ---
+        for p in images_show_list:
+            if not Path(p).is_file():
+                raise FileNotFoundError(f"No such file: {p}")
+
+        # --- Open all images ---
+        imgs = [Image.open(p).convert("RGB") for p in images_show_list]
+
+        # --- Draw borders ---
         ImageDraw.Draw(imgs[0]).rectangle(
-            [(0, 0), (imgs[0].width, imgs[0].height)], outline="blue", width=10)
+            [(0, 0), (imgs[0].width, imgs[0].height)], outline="blue", width=10
+        )
         for i in range(1, len(imgs)):
-            img = imgs[i]
-            if images_class_list[0] != images_class_list[i]:
-                ImageDraw.Draw(img).rectangle(
-                    [(0, 0), (img.width, img.height)], outline="red", width=10)
-            else:
-                ImageDraw.Draw(img).rectangle(
-                    [(0, 0), (img.width, img.height)], outline="green", width=10)
-        # test = [ImageDraw.Draw(img).rectangle(
-        #    [(0, 0), (img.width, img.height)], outline="red", width=4) for img in imgs]
+            color = "green" if images_class_list[0] == images_class_list[i] else "red"
+            ImageDraw.Draw(imgs[i]).rectangle(
+                [(0, 0), (imgs[i].width, imgs[i].height)], outline=color, width=10
+            )
 
-        #########################
-
-        # pick the image which is the smallest, and resize the others to match it (can be arbitrary image shape here)
-        if all((
-                isinstance(images_shape, tuple),
-                len(images_shape) == 2,
-                isinstance(images_shape[0], int),
-                isinstance(images_shape[1], int))):
-            if (images_shape[0] == 0 and images_shape[1] == 0):
-                min_shape = sorted([(np.sum(i.size), i.size)
-                                    for i in imgs])[0][1]
+        # --- Decide resize shape ---
+        if (
+            isinstance(images_shape, tuple)
+            and len(images_shape) == 2
+            and all(isinstance(x, int) for x in images_shape)
+        ):
+            if images_shape == (0, 0):
+                # safer resize: use min width and min height
+                min_w = min(img.width for img in imgs)
+                min_h = min(img.height for img in imgs)
+                min_shape = (min_w, min_h)
             else:
                 min_shape = images_shape
         else:
-            print("Impossible to generate visualization.")
-            print("Image sizes must be a tuple of 2 elements of type integer.")
-            return
+            raise ValueError("images_shape must be (int, int), e.g., (128, 128).")
 
+        # --- Concatenate horizontally ---
         imgs_comb = np.concatenate(
-            [np.array(x.resize(min_shape)) for x in imgs], axis=1)
-
-        # save that beautiful picture
+            [np.array(img.resize(min_shape)) for img in imgs], axis=1
+        )
         imgs_comb = Image.fromarray(imgs_comb)
 
+        # --- Return/save result ---
         if save:
             imgs_comb.save(img_path)
-            return
+            return Path(img_path)
         else:
             imgs_comb.show()
             return imgs_comb

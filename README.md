@@ -61,7 +61,7 @@ Note that the example had the paths set, some parameters changed and the return 
 
 ```python
 from pyUDLF import run_calls as udlf
-from pyUDLF import inputType
+from pyUDLF.utils import inputType
 
 # Setting the binary and config path (1)
 udlf.setBinaryPath("/home/usr/Desktop/UDLF/UDLF/bin/udlf")

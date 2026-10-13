@@ -344,28 +344,18 @@ def individual_gain_config_running(config_file: str, depth: int = -1):
         logger.error("Output file must be ranked list type (RK).")
         return None
 
-    # --- Handle depth ---
-    if depth == -1:
-        logger.warning("Depth not set, using dataset size instead.")
-        try:
-            with open(params["list_path"], "r") as f:
-                depth = len([line.strip() for line in f])
-        except Exception as e:
-            logger.error(f"Failed to read list file {params['list_path']} to determine depth: {e}")
-            return None
-
     # --- Read data ---
     try:
         classes_list = readData.read_classes(params["list_path"], params["classes_path"])
+        rks_after = readData.read_ranked_lists_file_numeric(params["after_path"])
+        # UDLF outputs lists of size L; by default the gain uses the whole
+        # output lists, i.e. the same depth as the MAP in the UDLF log
+        if depth == -1:
+            depth = min(len(rk) for rk in rks_after)
         rks_before = readData.read_ranked_lists_file_numeric(params["before_path"], top_k=depth)
-        rks_after = readData.read_ranked_lists_file_numeric(params["after_path"], top_k=depth)
     except Exception as e:
         logger.error(f"Failed to read input/output ranked lists: {e}")
         return None
-
-    if len(rks_before) < depth:
-        logger.warning("Depth larger than ranked list size. Adjusting depth to max size.")
-        depth = len(rks_before)
 
     # --- Compute gain ---
     try:
@@ -422,19 +412,19 @@ def prepare_visualization(params: dict, output: "OutputType") -> bool:
     if out_format != "RK":
         logger.error("The output file must be of type 'RK'.")
         return False
-    if out_rk_format != "NUM":
-        logger.error("The output format of the ranked lists must be 'NUM'.")
+    if out_rk_format not in ("NUM", "ALL"):
+        logger.error("The output format of the ranked lists must be 'NUM' or 'ALL'.")
         return False
     if not os.path.isdir(img_path):
         logger.warning(f"Images directory does not exist: {img_path}")
         return False
-    
-    if not os.path.isdir(list_path):
-        logger.warning(f"List file does not exist: {img_path}")
+
+    if not os.path.isfile(list_path):
+        logger.warning(f"List file does not exist: {list_path}")
         return False
-    
-    if not os.path.isdir(classes_path):
-        logger.warning(f"Classes file does not exist: {img_path}")
+
+    if not os.path.isfile(classes_path):
+        logger.warning(f"Classes file does not exist: {classes_path}")
         return False
 
     # If everything is valid, update output

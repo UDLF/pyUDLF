@@ -1,6 +1,12 @@
 from pyUDLF import run_calls
 
 
+def _sort_results(results):
+    """Sort (value, label) pairs, best value first; failed runs ("NONE") last."""
+    return sorted(results, key=lambda r: float("-inf") if r[0] == "NONE" else r[0],
+                  reverse=True)
+
+
 def find_best_param(input_type, method, param_value, list_values, ranked_list_size=0, verbose=False):
     """
     method -> metodo para testa o parametro
@@ -97,9 +103,9 @@ def find_best_param(input_type, method, param_value, list_values, ranked_list_si
     p_values = input_type.get_param("EFFECTIVENESS_COMPUTE_PRECISIONS")
     map_values = input_type.get_param("EFFECTIVENESS_COMPUTE_MAP")
 
-    r_values = r_values[0].strip()
-    p_values = p_values[0].strip()
-    map_values = map_values[0].strip()
+    r_values = r_values[0].strip().upper() == "TRUE"
+    p_values = p_values[0].strip().upper() == "TRUE"
+    map_values = map_values[0].strip().upper() == "TRUE"
 
     # adicionar chaves de recall
     if(r_values):
@@ -177,7 +183,7 @@ def find_best_param(input_type, method, param_value, list_values, ranked_list_si
             method.upper()), old_ranked_list_size)
 
     for param in best_dict:
-        best_dict[param] = sorted(best_dict[param], reverse=True)
+        best_dict[param] = _sort_results(best_dict[param])
         # sorted(l, key=lambda x: 0 if x[0] is None else x[0])
 
 
@@ -237,9 +243,9 @@ def find_best_method(input_type, ranked_list_size=0, verbose=True):
     p_values = input_type.get_param("EFFECTIVENESS_COMPUTE_PRECISIONS")
     map_values = input_type.get_param("EFFECTIVENESS_COMPUTE_MAP")
 
-    r_values = r_values[0].strip()
-    p_values = p_values[0].strip()
-    map_values = map_values[0].strip()
+    r_values = r_values[0].strip().upper() == "TRUE"
+    p_values = p_values[0].strip().upper() == "TRUE"
+    map_values = map_values[0].strip().upper() == "TRUE"
 
     # adicionando chaves com valores vazias ao dicionario
     # new_value = [(0, "TEST"), (0, "TEST")]
@@ -316,7 +322,7 @@ def find_best_method(input_type, ranked_list_size=0, verbose=True):
         # best_dict['MAP'] = sorted(best_dict['MAP'], reverse=True)
 
     for param in best_dict:
-        best_dict[param] = sorted(best_dict[param], reverse=True)
+        best_dict[param] = _sort_results(best_dict[param])
 
     # print(best_dict['MAP'])
     # print(best_dict['Recall@4'])
@@ -403,7 +409,7 @@ def find_best_method_with_best_k(input_type, measures=[], k_interval=[], ranked_
                         input_type.set_param("PARAM_{}_K".format(method), k)
 
                 best_dict_aux = find_best_method(
-                    input_type, ranked_list_size=280, verbose=verbose)
+                    input_type, ranked_list_size=ranked_list_size, verbose=verbose)
 
                 # taking best values:
                 # if measure exist

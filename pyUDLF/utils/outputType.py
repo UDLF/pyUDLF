@@ -169,8 +169,9 @@ class OutputType:
         if not self.individual_gain_list:
             logger.warning("individual_gain_list is empty. Returning [].")
             return []
-        # Pair each gain with its index
-        paired = [(gain, idx) for idx, gain in enumerate(self.individual_gain_list)]
+        # compute_gain already returns (gain, index) pairs; plain gains are paired here
+        paired = [item if isinstance(item, tuple) else (item, idx)
+                  for idx, item in enumerate(self.individual_gain_list)]
 
         # Optionally sort
         if sort:

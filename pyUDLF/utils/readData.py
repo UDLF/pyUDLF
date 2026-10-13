@@ -1,3 +1,5 @@
+import re
+
 
 def read_config(path):
     """
@@ -51,68 +53,59 @@ def parse_log(text):
         text -> log text
 
     Returns:
-        log_parameters -> dictionary with results
+        log_parameters -> dictionary with results, as numbers:
+            "Time": execution time in seconds
+            UDL task: {"MAP": {"Before": 0.50, "After": 0.63, "Gain": 27.6}, "P@10": ...}
+                      ("Gain" is the relative gain in percent)
+            FUSION task: {"MAP": 0.63, "P@10": ...} (results after fusion)
     """
     log_parameters = dict()
-    before = []
-    after = []
-    gains = []
-    parametros = []
-    metodo = "NONE"
+    task = "UDL"
+    section = None
+    values = {"Before": {}, "After": {}, "Gain": {}}
 
-    lines = [x.strip() for x in text.splitlines()]
-    for i in range(len(lines)):
-        if "Task" in lines[i]:
-            line = lines[i].split(':')
-            metodo = line[1].strip()
+    for raw in text.splitlines():
+        line = raw.strip()
 
-        if "Time" in lines[i]:
-            line = lines[i].split(':')
-            log_parameters["Time"] = line[1]
+        match = _LOG_TASK.match(line)
+        if match:
+            task = match.group(1)
+            continue
 
-        if metodo == "FUSION":
-            if "Effectiveness" in lines[i]:
-                i = i + 1
-                while("-" not in lines[i]):
-                    line = lines[i].split()
-                    parametros.append(line[0])
-                    before.append(line[1])
-                    i = i + 1
-                j = 0
-                for j in range(len(parametros)):
-                    log_parameters[parametros[j]] = before[j]
+        match = _LOG_TIME.search(line)
+        if match:
+            log_parameters["Time"] = float(match.group(1))
+            continue
 
-        else:
-            if "Before" in lines[i]:
-                i = i + 1
-                while ("After" not in lines[i]):
-                    line = lines[i].split()
-                    parametros.append(line[0])
-                    before.append(line[1])
-                    # log_parameters[line[0]] = line[1]
-                    i = i + 1
+        if line.startswith("Before:"):
+            section = "Before"
+        elif line.startswith("After:"):
+            section = "After"
+        elif line.startswith("Relative Gains:"):
+            section = "Gain"
+        elif line.startswith("* Effectiveness:"):
+            section = "After"  # FUSION logs only have the results after fusion
+        elif line.startswith("---"):
+            section = None
+        elif section:
+            match = _LOG_METRIC.match(line)
+            if match:
+                values[section][match.group(1)] = float(match.group(2))
 
-                i = i + 1
-                while ("Relative Gains" not in lines[i]):
-                    line = lines[i].split()
-                    after.append(line[1])
-                    i = i + 1
-
-                i = i + 1
-                j = 0
-                while (j < len(parametros)):
-                    line = lines[i].split()
-                    gains.append(line[1])
-                    i = i + 1
-                    j = j + 1
-
-                j = 0
-                for j in range(len(parametros)):
-                    log_parameters[parametros[j]] = dict(
-                        [("Before", before[j]),
-                         ("After", after[j]),
-                         ("Gain", gains[j])])
+    if task == "FUSION":
+        log_parameters.update(values["After"])
+    else:
+        for name, before in values["Before"].items():
+            log_parameters[name] = {"Before": before,
+                                    "After": values["After"].get(name),
+                                    "Gain": values["Gain"].get(name)}
     return log_parameters
+
+
+# Lines of the log written by UDLF (Udl::generateExecutionLog)
+_LOG_TASK = re.compile(r"^Task:\s*(\w+)")
+_LOG_TIME = re.compile(r"Total Time of the Algorithm Execution:\s*(\S+)\s*s")
+_LOG_METRIC = re.compile(r"^(P@\d+|Recall@\d+|MAP)\s+(\S+?)%?$")
 
 
 def read_ranked_lists_file_numeric(file_path, top_k=-1):
@@ -191,33 +184,29 @@ def read_matrix_file(file_path):
 
 def read_classes(lists_path="", classes_path="", input_type=None):
     '''
-    Dado o arquivo de listas e de classes no padrão do UDLF, retorna uma lista
-    com a classe de cada elemento na ordem.
+    Given the lists file and the classes file (UDLF format, "name:class"),
+    return the class of each element, in the order of the lists file.
 
-    se input foi dado, pegara dele, se nao, dos paths fornecidos
+    Class labels are returned as int when numeric, otherwise as str.
+    If input_type is given, the paths are taken from it.
     '''
     if input_type is not None:
         classes_path = str(input_type.get_classes_file()[0].strip())
         lists_path = str(input_type.get_lists_file()[0].strip())
 
-    # lê o lists
-    f = open(lists_path)
-    lists = [x.strip() for x in f.readlines()]
-    f.close()
+    # like UDLF, both files are read as whitespace separated tokens
+    with open(lists_path) as f:
+        lists = f.read().split()
 
-    # lê as classes em um dicionário
-    f = open(classes_path)
-    content = [x.strip() for x in f.readlines()]
     classes_dict = dict()
-    for line in content:
-        key = line.split(':')[0]
-        value = int(line.split(':')[-1])
-        classes_dict[key] = value
-    f.close()
+    with open(classes_path) as f:
+        for token in f.read().split():
+            name, _, label = token.partition(':')
+            classes_dict[name] = int(label) if label.lstrip('-').isdigit() else label
 
-    # calcula uma lista com a classe de cada elemento na ordem
-    classes_list = []
-    for element in lists:
-        classes_list.append(classes_dict[element])
+    missing = [element for element in lists if element not in classes_dict]
+    if missing:
+        raise KeyError(f"{len(missing)} elements of {lists_path} have no class in "
+                       f"{classes_path} (first: {missing[0]!r})")
 
-    return classes_list
+    return [classes_dict[element] for element in lists]

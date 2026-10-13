@@ -1,150 +1,130 @@
+"""
+Effectiveness measures for ranked lists, computed as UDLF does
+(src/Evaluation/Effectiveness.cpp), so the values match the UDLF log.
+
+In every function:
+    rks          -> ranked lists, one per query (rks[i] is the list of query i)
+    classes_list -> class label of each element, in the dataset order
+    depth        -> number of positions considered; -1 means the whole lists.
+                    A depth larger than the lists is reduced to their size.
+"""
+
 import numpy as np
 
+from pyUDLF.utils.logger import get_logger
 
-def compute_map(rks, classes_list, map_depth=-1):
-    map_list = []
-    class_size_dict = get_class_size_dict(classes_list)
-    
-    if map_depth == -1:
-        print("WARNING: depth of the ranked_list size not set, setting to max ranked list size!")
-        map_depth = len(rks)
+logger = get_logger(__name__)
 
 
-    if len(rks) <= map_depth:
-        if len(rks) < map_depth:
-            print(
-                "WARNING: depth larger than the ranked_list size, set depth to max ranked list size!")
-        map_depth = len(rks)
-        # print(map_depth)
-
-    for i, rk in enumerate(rks):
-        acum = 0
-        value = 0
-        # print(rk)
-        # cl_i = class_size_dict[i]#i//class_size
-        cl_i = classes_list[i]
-        # if len(rks)<=depth
-        # else colocar tamanho maximo q eh len(rks)dar um warnin
-
-        for j in range(map_depth):
-            cl_j = classes_list[rk[j]]
-            if cl_i == cl_j:
-                value += 1
-                acum += value/(j+1)
-
-        map_list.append(acum/class_size_dict[cl_i])
-        # map_list.append(acum/class_size_dict[cl_i]) ###
-    map_value = np.mean(map_list)
-    return round(map_value, 4), map_list
+def _resolve_depth(rks, depth, name="depth"):
+    size = min(len(rk) for rk in rks)
+    if depth == -1:
+        return size
+    if depth > size:
+        logger.warning("%s=%d is larger than the ranked lists (%d); using %d.",
+                       name, depth, size, size)
+        return size
+    return depth
 
 
 def get_class_size_dict(class_list):
     class_size_dict = dict()
-    for i in range(len(class_list)):
-        if class_list[i] not in class_size_dict:
-            class_size_dict[class_list[i]] = 1
-        else:
-            class_size_dict[class_list[i]] = class_size_dict[class_list[i]] + 1
-
+    for label in class_list:
+        class_size_dict[label] = class_size_dict.get(label, 0) + 1
     return class_size_dict
 
 
-def compute_recall(rks, classes_list, r_depth=-1):
-    recall_list = []
+def compute_map(rks, classes_list, map_depth=-1):
+    """
+    Mean Average Precision at map_depth.
+
+    The average precision of a query is divided by min(depth, size of its
+    class), as in UDLF.
+
+    Returns:
+        (MAP rounded to 4 decimals, list with the average precision of each query)
+    """
+    depth = _resolve_depth(rks, map_depth, "map_depth")
     class_size_dict = get_class_size_dict(classes_list)
-    
-    if r_depth == -1:
-        print("WARNING: depth of the ranked_list size not set, setting to max ranked list size!")
-        r = len(rks)
-        
-    if len(rks) <= r_depth:
-        if len(rks) < r_depth:
-            print(
-                "Warning, depth larger than the ranked_list size, set depth to max ranked list size!")
-        r_depth = len(rks)
 
+    map_list = []
     for i, rk in enumerate(rks):
-        acum = 0
-        # print(rk)
         cl_i = classes_list[i]
-        for j in range(r_depth):
-            cl_j = classes_list[rk[j]]
-            if cl_i == cl_j:
-                acum += 1
+        hits = 0
+        acum = 0.0
+        for j in range(depth):
+            if classes_list[rk[j]] == cl_i:
+                hits += 1
+                acum += hits / (j + 1)
+        map_list.append(acum / min(depth, class_size_dict[cl_i]))
 
-        recall_list.append(acum/class_size_dict[cl_i])
-        # map_list.append(acum/class_size_dict[cl_i]) ###
-    r_value = np.mean(recall_list)
-    return round(r_value, 4), recall_list
+    return round(float(np.mean(map_list)), 4), map_list
+
+
+def compute_recall(rks, classes_list, r_depth=-1):
+    """
+    Recall at r_depth.
+
+    As in UDLF, the recall is averaged over the queries of each class and then
+    over the classes (classes have the same weight, whatever their size).
+
+    Returns:
+        (recall rounded to 4 decimals, list with the recall of each query)
+    """
+    depth = _resolve_depth(rks, r_depth, "r_depth")
+    class_size_dict = get_class_size_dict(classes_list)
+
+    recall_list = []
+    for i, rk in enumerate(rks):
+        cl_i = classes_list[i]
+        hits = sum(1 for j in range(depth) if classes_list[rk[j]] == cl_i)
+        recall_list.append(hits / class_size_dict[cl_i])
+
+    by_class = {}
+    for i, value in enumerate(recall_list):
+        by_class.setdefault(classes_list[i], []).append(value)
+    r_value = np.mean([np.mean(values) for values in by_class.values()])
+
+    return round(float(r_value), 4), recall_list
 
 
 def compute_precision(rks, classes_list, p_depth=-1):
+    """
+    Precision at p_depth.
+
+    Returns:
+        (precision rounded to 4 decimals, list with the precision of each query)
+    """
+    depth = _resolve_depth(rks, p_depth, "p_depth")
+
     precision_list = []
-    class_size_dict = get_class_size_dict(classes_list)
-    if p_depth == -1:
-        print("WARNING: depth of the ranked_list size not set, setting to max ranked list size!")
-        p_depth = len(rks)
-        
-    if len(rks) <= p_depth:
-        if len(rks) < p_depth:
-            print(
-                "Warning, depth larger than the ranked_list size, set depth to max ranked list size!")
-        p_depth = len(rks)
-
     for i, rk in enumerate(rks):
-        acum = 0
-        # print(rk)
         cl_i = classes_list[i]
-        for j in range(p_depth):
-            cl_j = classes_list[rk[j]]
-            if cl_i == cl_j:
-                acum += 1
+        hits = sum(1 for j in range(depth) if classes_list[rk[j]] == cl_i)
+        precision_list.append(hits / depth)
 
-        precision_list.append(acum/p_depth)
-        # map_list.append(acum/class_size_dict[cl_i]) ###
-    p_value = np.mean(precision_list)
-    return round(p_value, 4), precision_list
+    return round(float(np.mean(precision_list)), 4), precision_list
 
 
 def compute_gain(before_rks, after_rks, classes_list, depth=-1, measure="MAP", verbose=True):
-    
-    if depth == -1:
-        print("WARNING: depth of the ranked_list size not set, setting to max ranked list size!")
-        depth = len(before_rks)
-    
+    """
+    Gain of each query: measure after minus measure before.
+
+    Returns:
+        list of (gain rounded to 4 decimals, query index)
+    """
     measure = measure.upper()
+    functions = {"MAP": compute_map, "PRECISION": compute_precision,
+                 "RECALL": compute_recall}
+    if measure not in functions:
+        raise ValueError(f"Unknown measure {measure!r}. Use one of {sorted(functions)}.")
+
+    depth = _resolve_depth(after_rks, _resolve_depth(before_rks, depth))
     if verbose:
-        print()
-        print("Calculating the gain for {} with depth {}".format(measure, depth))
+        logger.info("Calculating the gain for %s with depth %d", measure, depth)
 
-    before_mean = 0
-    after_mean = 0
-    before_list = []
-    after_list = []
-    gain_list = []
-    class_size_dict = get_class_size_dict(classes_list)
+    _, before_list = functions[measure](before_rks, classes_list, depth)
+    _, after_list = functions[measure](after_rks, classes_list, depth)
 
-    if measure == "MAP":
-        before_mean, before_list = compute_map(before_rks, classes_list, depth)
-        after_mean, after_list = compute_map(after_rks, classes_list, depth)
-    elif measure == "PRECISION":
-        before_mean, before_list = compute_precision(
-            before_rks, classes_list, depth)
-        after_mean, after_list = compute_precision(
-            after_rks, classes_list, depth)
-    elif measure == "RECALL":
-        before_mean, before_list = compute_recall(
-            before_rks, classes_list, depth)
-        after_mean, after_list = compute_recall(after_rks, classes_list, depth)
-
-    #gain_mean = round(after_mean - before_mean, 4)
-    # print("aqui")
-    #print(before_mean, after_mean)
-    #gain_mean_percent = round((((after_mean-before_mean))/before_mean)*100, 4)
-    #gain_mean_percent = (((after_mean-before_mean))/before_mean)*100
-    # print(gain_mean_percent)
-
-    for i in range(len(after_list)):
-        gain_list.append((round(after_list[i]-before_list[i], 4), i))
-
-    return gain_list  # , gain_mean_percent, gain_mean
+    return [(round(after - before, 4), i)
+            for i, (before, after) in enumerate(zip(before_list, after_list))]

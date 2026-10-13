@@ -3,12 +3,6 @@ Parser module for configuration and log files.
 Handles reading and validation of UDLF config and log outputs.
 """
 
-import os
-import logging
-from pyUDLF.utils import readData
-
-# Module-level logger (public lib style: no handler here)
-logger = logging.getLogger(__name__)
 
 
 def read_config_values(config_file: str) -> dict:
@@ -44,65 +38,55 @@ def parse_config(config_file: str) -> dict:
     Returns:
         dict: Parsed configuration parameters.
     """
+    values = read_config_values(config_file)
+
+    def get(name):
+        # variables not declared take the UDLF default (config/general.conf)
+        return values.get(name, _UDLF_DEFAULTS.get(name, ""))
+
     params = {
-        "task": "",
-        "in_file_format": "",
-        "in_rk_format": "",
-        "out_file": "",
-        "out_file_format": "",
-        "out_rk_format": "",
-        "before_path": "",
-        "list_path": "",
-        "classes_path": "",
+        "task": get("UDL_TASK"),
+        "in_file_format": get("INPUT_FILE_FORMAT"),
+        "in_rk_format": get("INPUT_RK_FORMAT"),
+        "out_file": get("OUTPUT_FILE"),
+        "out_file_format": get("OUTPUT_FILE_FORMAT"),
+        "out_rk_format": get("OUTPUT_RK_FORMAT"),
+        "before_path": get("INPUT_FILE"),
+        "list_path": get("INPUT_FILE_LIST"),
+        "classes_path": get("INPUT_FILE_CLASSES"),
         "after_path": "",
         "rk_path": "",
         "matrix_path": "",
-        "log_path": "",
-        "images_path":""
+        "log_path": get("OUTPUT_LOG_FILE_PATH"),
+        "images_path": get("INPUT_IMAGES_PATH"),
     }
-    with open(config_file, "r") as f:
-        lines = [line.strip() for line in f if line.strip()]
 
-    for line in lines:
-        if line.startswith("UDL_TASK"):
-            params["task"] = line.split("=")[1].split("#")[0].strip()
-
-        elif line.startswith("INPUT_FILE "):  # explicit INPUT_FILE
-            params["before_path"] = line.split("=")[1].split("#")[0].strip()
-
-        elif line.startswith("INPUT_FILE_LIST"):
-            params["list_path"] = line.split("=")[1].split("#")[0].strip()
-
-        elif line.startswith("INPUT_FILE_CLASSES"):
-            params["classes_path"] = line.split("=")[1].split("#")[0].strip()
-
-        elif line.startswith("INPUT_IMAGES_PATH"):
-            params["images_path"] = line.split("=")[1].split("#")[0].strip()
-
-        elif line.startswith("INPUT_FILE_FORMAT"):
-            params["in_file_format"] = line.split("=")[1].split("#")[0].strip()
-
-        elif line.startswith("INPUT_RK_FORMAT"):
-            params["in_rk_format"] = line.split("=")[1].split("#")[0].strip()
-
-        elif line.startswith("OUTPUT_FILE "):  # explicit OUTPUT_FILE
-            params["out_file"] = line.split("=")[1].split("#")[0].strip()
-
-        elif line.startswith("OUTPUT_FILE_FORMAT"):
-            params["out_file_format"] = line.split("=")[1].split("#")[0].strip()
-
-        elif line.startswith("OUTPUT_RK_FORMAT"):
-            params["out_rk_format"] = line.split("=")[1].split("#")[0].strip()
-
-        elif line.startswith("OUTPUT_FILE_PATH"):
-            base = line.split("=")[1].split("#")[0].strip()
-            if params["out_file_format"] == "RK":
-                params["rk_path"] = f"{base}.txt"
-            elif params["out_file_format"] == "MATRIX":
-                params["matrix_path"] = f"{base}.txt"
-            params["after_path"] = f"{base}.txt"  # useful for before/after comparison
-
-        elif line.startswith("OUTPUT_LOG_FILE_PATH"):
-            params["log_path"] = line.split("=")[1].split("#")[0].strip()
+    # Output file names written by UDLF (Udl::writeOutput)
+    if params["out_file"] == "TRUE":
+        base = get("OUTPUT_FILE_PATH")
+        if params["out_file_format"] == "MATRIX":
+            params["matrix_path"] = f"{base}.txt"
+        elif params["out_rk_format"] in ("NUM", "STR"):
+            params["rk_path"] = f"{base}.txt"
+        elif params["out_rk_format"] == "ALL":
+            params["rk_path"] = f"{base}_num.txt"  # also <base>_str.txt and html
+        params["after_path"] = params["rk_path"] or params["matrix_path"]
 
     return params
+
+
+# Defaults UDLF uses for variables that are not declared (config/general.conf)
+_UDLF_DEFAULTS = {
+    "UDL_TASK": "UDL",
+    "INPUT_FILE_FORMAT": "AUTO",
+    "INPUT_RK_FORMAT": "NUM",
+    "INPUT_FILE": "input.txt",
+    "INPUT_FILE_LIST": "list.txt",
+    "INPUT_FILE_CLASSES": "classes.txt",
+    "INPUT_IMAGES_PATH": "images/",
+    "OUTPUT_FILE": "TRUE",
+    "OUTPUT_FILE_FORMAT": "RK",
+    "OUTPUT_RK_FORMAT": "NUM",
+    "OUTPUT_FILE_PATH": "output",
+    "OUTPUT_LOG_FILE_PATH": "log.txt",
+}

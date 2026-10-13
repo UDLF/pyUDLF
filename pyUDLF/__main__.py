@@ -10,6 +10,7 @@ Command line of pyUDLF:
 """
 
 import argparse
+import os
 import sys
 
 from pyUDLF import __version__, install
@@ -41,8 +42,15 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         if args.command == "download":
+            home = install.pyudlf_home() if args.dest is None else args.dest
+            installed = os.path.isfile(os.path.join(os.path.expanduser(str(home)), "bin",
+                                                    install.binary_name()))
             path = install.download_udlf(args.udlf_version, args.dest, args.force)
-            print(f"UDLF installed at {path}")
+            if installed and not args.force:
+                print(f"UDLF is already installed at {path} "
+                      "(use --force to download it again)")
+            else:
+                print(f"UDLF installed at {path}")
         elif args.command == "where":
             print(UDLF().bin_path)
         elif args.command == "methods":

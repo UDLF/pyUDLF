@@ -71,6 +71,26 @@ def test_download_installs_binary_and_config(fake_release, tmp_path):
     assert installed == ["bin", "config.ini", install.binary_name()]  # no ._*, .DS_Store
 
 
+def test_windows_release_layout(tmp_path, monkeypatch):
+    """Members of the official Windows archive of UDLF v1.70 (a .tar.gz, not a
+    zip), as listed from the real file."""
+    names = ["._.", "./._.DS_Store", "./.DS_Store", "./._LICENSE", "./LICENSE", "./._bin",
+             "./._README.md", "./README.md", "./bin/._config.ini", "./bin/config.ini",
+             "./bin/._udlf.exe", "./bin/udlf.exe"]
+    archive = make_archive(tmp_path, {name: b"MZ" if name.endswith("udlf.exe") else b"x"
+                                      for name in names})
+    monkeypatch.setattr(install, "binary_name", lambda: "udlf.exe")
+    monkeypatch.setattr(install, "platform_key", lambda: "windows-x86_64")
+    monkeypatch.setattr(install, "RELEASES", {"9.9": {"windows-x86_64": (
+        archive.as_uri(), _sha256(archive))}})
+
+    path = install.download_udlf("9.9", dest=tmp_path / "home")
+
+    assert path == str(tmp_path / "home" / "bin" / "udlf.exe")
+    assert sorted(p.name for p in (tmp_path / "home" / "bin").iterdir()) == \
+        ["config.ini", "udlf.exe"]
+
+
 def test_installed_binary_is_not_downloaded_again(fake_release, tmp_path, monkeypatch):
     install.download_udlf("9.9", dest=tmp_path / "home")
     monkeypatch.setattr(install, "_fetch", lambda *a: pytest.fail("downloaded again"))
@@ -174,7 +194,12 @@ def test_legacy_verify_bin_does_not_download_for_custom_path(fake_release, tmp_p
 # --------------------------------------------------------------------------
 
 def test_cli_download(fake_release, tmp_path, capsys):
-    assert main(["download", "--version", "9.9", "--dest", str(tmp_path / "home")]) == 0
+    dest = str(tmp_path / "home")
+    assert main(["download", "--version", "9.9", "--dest", dest]) == 0
+    assert "UDLF installed at" in capsys.readouterr().out
+    assert main(["download", "--version", "9.9", "--dest", dest]) == 0
+    assert "already installed" in capsys.readouterr().out
+    assert main(["download", "--version", "9.9", "--dest", dest, "--force"]) == 0
     assert "UDLF installed at" in capsys.readouterr().out
 
 

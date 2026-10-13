@@ -24,7 +24,14 @@ This way, all the calls are made as if the UDLF is in Python, but pyUDLF actuall
 
 
 ## How to install
-python setup.py install
+Requires Python 3.9+.
+
+```bash
+pip install git+https://github.com/UDLF/pyUDLF.git          # core
+pip install "pyUDLF[viz] @ git+https://github.com/UDLF/pyUDLF.git"  # + ranked list images (Pillow)
+```
+
+From a local clone: `pip install .` (or `pip install -e ".[viz,test]"` for development).
 
 
 ## First Steps

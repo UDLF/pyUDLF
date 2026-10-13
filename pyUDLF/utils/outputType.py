@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Optional, List, Union
 
 import numpy as np
-from PIL import Image, ImageDraw
 
 from pyUDLF.utils.visualization import render_ranked_list
 

@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 import tarfile
 import tempfile
@@ -48,16 +49,17 @@ udlf_urls = {"linux": "http://udlf_linux.lucasvalem.com",
 #---------
 def setBinaryPath(path: str) -> None:
     """
-    Update the binary path if the file exists, otherwise revert to the original.
+    Set the path of the UDLF binary used by run() and runWithConfig().
+
+    Raises:
+        FileNotFoundError: if there is no file at the given path.
     """
     global bin_path
-    if os.path.isfile(path):
-        bin_path = path
-        logger.info(f"Binary path set to: {bin_path}")
-    else:
-        logger.warning(f"Binary not found at: {path}. Reverting to default.")
-        bin_path = original_bin_path
-        logger.info(f"Binary path set to: {bin_path}")
+    path = os.path.expanduser(str(path))
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"UDLF binary not found at: {path}")
+    bin_path = path
+    logger.info(f"Binary path set to: {bin_path}")
 
 
 def getBinaryPath() -> str:
@@ -71,16 +73,17 @@ def getBinaryPath() -> str:
 
 def setConfigPath(path: str) -> None:
     """
-    Update the config path if the file exists, otherwise revert to the original.
+    Set the path of the template config used by new InputType objects.
+
+    Raises:
+        FileNotFoundError: if there is no file at the given path.
     """
     global config_path
-    if os.path.isfile(path):
-        config_path = path
-        logger.info(f"Config path set to: {config_path}")
-    else:
-        logger.warning(f"Config not found at: {path}. Reverting to default.")
-        config_path = original_config_path
-        logger.info(f"Config path set to: {config_path}")
+    path = os.path.expanduser(str(path))
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"UDLF config not found at: {path}")
+    config_path = path
+    logger.info(f"Config path set to: {config_path}")
 
 
 def getConfigPath() -> str:
@@ -212,18 +215,13 @@ def run_platform(config_file: str, bin_path: str):
 
     Returns:
         tuple:
-            bool: True if run completed without detected errors, False otherwise.
-            str: Path to the generated log file.
+            bool: True if the run FAILED, False if it completed correctly.
+            str: Everything UDLF printed (stdout and stderr).
     """
     global operating_system
 
     # Ensure binary and config exist (download/extract if missing)
     verify_bin(config_file, bin_path)
-
-    # Create a unique temporary log file
-    tmp_log = tempfile.NamedTemporaryFile(suffix="_udlf_log.txt", delete=False)
-    path_log_out = tmp_log.name
-    tmp_log.close()
 
     # Build command
     cmd = [bin_path, config_file]
@@ -232,73 +230,76 @@ def run_platform(config_file: str, bin_path: str):
 
     logger.info(f"Running UDLF framework with config: {config_file}")
     logger.debug(f"Command: {' '.join(cmd)}")
-    logger.debug(f"Logs will be written to: {path_log_out}")
 
     try:
-        with open(path_log_out, "w") as log_file:
-            subprocess.run(cmd, stdout=log_file, stderr=subprocess.STDOUT, check=False)
-    except Exception as e:
-        logger.error(f"Failed to run UDLF binary: {e}")
-        return False, path_log_out
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                              text=True, errors="replace", check=False)
+    except OSError as e:
+        logger.error(f"Failed to run UDLF binary {bin_path}: {e}")
+        return True, ""
 
-    # Verify run completed successfully
-    run_ok = verify_running(path_log_out)
-    if not run_ok:
-        logger.info("UDLF run successfully.")
-    else:
-        logger.warning("UDLF run did not complete as expected.")
+    problems = verify_running(proc.returncode, proc.stdout)
+    if problems:
+        for problem in problems:
+            logger.error(problem)
+        logger.error("Last lines printed by UDLF:\n%s", _tail(proc.stdout))
+        return True, proc.stdout
 
-    return run_ok, path_log_out
+    logger.info("UDLF run successfully.")
+    return False, proc.stdout
 
-def verify_running(path: str) -> bool:
+
+# Messages UDLF prints when it replaces a value set by the user with its
+# default. The run still exits with code 0, so they are checked explicitly.
+_REJECTED_VALUE_PATTERNS = [
+    re.compile(r"\*WARNING: You've declared (\S+) = (.*?)! Expected values are: \[(.*?)\]"),
+    re.compile(r"\*WARNING: Type of (\S+) is (\w+)! (.*?) is invalid!"),
+]
+_SIGNAL_HINTS = {
+    11: "segmentation fault; this usually means the input ranked lists are shorter "
+        "than the method's L parameter, or SIZE_DATASET does not match the input",
+}
+
+
+def verify_running(returncode: int, output: str) -> list:
     """
-    Check a log file for error keywords or warning messages.
+    Decide whether a UDLF run failed.
+
+    UDLF exits with code 1 on every validation or input error, and a crash
+    shows up as a negative return code (killed by a signal). Some invalid
+    values are only replaced by their defaults with a warning, so those
+    messages are reported too.
+
+    Args:
+        returncode (int): return code of the UDLF process.
+        output (str): everything UDLF printed.
 
     Returns:
-        bool: True if any error (or aborting warning) is found, False otherwise.
+        list[str]: description of each problem found; empty if the run is OK.
     """
-    error_flag = False
-    error_keywords = [
-        "invalid",
-        "error",
-        "can't",
-        "failed",
-        "failure",
-        "exception",
-        "traceback",
-        "not found",
-        "critical",
-        "unable",
-        "denied",
-        
-    ]
+    problems = []
+    if returncode < 0:
+        signal = -returncode
+        hint = _SIGNAL_HINTS.get(signal, "")
+        problems.append(f"UDLF was killed by signal {signal}" + (f" ({hint})" if hint else ""))
+    elif returncode != 0:
+        problems.append(f"UDLF exited with code {returncode}")
 
-    try:
-        with open(path, "r", encoding="utf-8") as file:
-            for line in file:
-                lowercase_line = line.lower()
+    for pattern in _REJECTED_VALUE_PATTERNS:
+        for match in pattern.finditer(output):
+            problems.append(
+                f"UDLF rejected {match.group(1)} = {match.group(2).strip()!r} "
+                "and used its default value instead")
 
-                # Check for errors
-                if any(keyword in lowercase_line for keyword in error_keywords):
-                    logger.error(f"[LOG ERROR] {line.strip()}")
-                    error_flag = True
+    for line in output.splitlines():
+        if line.strip().endswith("is being declared again!"):
+            logger.warning(f"UDLF: {line.strip()} (the last value is used)")
 
-                # Check for warnings
-                if "warning" in lowercase_line:
-                    logger.warning(f"[LOG WARNING] {line.strip()}")
-                    # Special case: warnings that abort execution
-                    if "abort" in lowercase_line:
-                        logger.error(f"[LOG ABORT] Execution stopped due to warning: {line.strip()}")
-                        error_flag = True
+    return problems
 
-    except FileNotFoundError:
-        logger.error(f"Log file not found: {path}")
-        return True
-    except Exception as e:
-        logger.error(f"Unexpected error while verifying log file {path}: {e}")
-        return True
 
-    return error_flag
+def _tail(text: str, lines: int = 15) -> str:
+    return "\n".join(text.rstrip().splitlines()[-lines:])
 
 def individual_gain_config_running(config_file: str, depth: int = -1):
     """
@@ -443,6 +444,81 @@ def prepare_visualization(params: dict, output: "OutputType") -> bool:
     logger.info("Visualization paths set successfully.")
     return True
 
+def _required_columns(values: dict):
+    """
+    Number of elements UDLF reads from each line of a ranked lists input,
+    or None when it cannot be determined from the config.
+    """
+    method = values.get("UDL_METHOD", "")
+    try:
+        n = int(values["SIZE_DATASET"])
+        if method in ("CONTEXTRR", "RLSIM"):  # these read the full ranked lists
+            return n
+        if method == "RDPAC":
+            return int(float(values["PARAM_RDPAC_L"]) * float(values["PARAM_RDPAC_L_MULT"]))
+        return int(values[f"PARAM_{method}_L"])
+    except (KeyError, ValueError):
+        return None
+
+
+def check_input_files(config_file: str) -> list:
+    """
+    Check the ranked lists inputs of a config before running UDLF.
+
+    UDLF reads exactly SIZE_DATASET lines with L elements each. If a line is
+    shorter, it silently continues reading from the next line and, at the end
+    of the file, repeats the last value: the run "succeeds" with wrong results
+    (or crashes, depending on the sizes). This check turns that into an error.
+
+    Args:
+        config_file (str): Path to the configuration file.
+
+    Returns:
+        list[str]: description of each problem found; empty if inputs are OK.
+    """
+    values = parser.read_config_values(config_file)
+    if values.get("INPUT_FILE_FORMAT", "AUTO") not in ("RK", "AUTO"):
+        return []
+    try:
+        n = int(values["SIZE_DATASET"])
+    except (KeyError, ValueError):
+        return []
+    required = _required_columns(values)
+
+    if values.get("UDL_TASK") == "FUSION":
+        try:
+            count = int(values.get("NUM_INPUT_FUSION_FILES", "0"))
+        except ValueError:
+            return []
+        files = [values.get(f"INPUT_FILES_FUSION_{i}") for i in range(1, count + 1)]
+    else:
+        files = [values.get("INPUT_FILE")]
+
+    problems = []
+    for path in files:
+        if not path or not os.path.isfile(path):
+            problems.append(f"Input file not found: {path}")
+            continue
+        rows = 0
+        short_line = None
+        with open(path, "r", errors="replace") as f:
+            for line in f:
+                if rows == n:
+                    break
+                if required is not None and len(line.split(None, required)) < required:
+                    short_line = (rows + 1, len(line.split()))
+                    break
+                rows += 1
+        if short_line:
+            problems.append(
+                f"Line {short_line[0]} of {path} has {short_line[1]} elements, but "
+                f"{values.get('UDL_METHOD')} reads {required} per line "
+                "(the method's L parameter). Use ranked lists of size >= L, or reduce L.")
+        elif rows < n:
+            problems.append(f"{path} has {rows} lines, but SIZE_DATASET = {n}.")
+    return problems
+
+
 def runWithConfig(
     config_file: str = None,
     get_output: bool = False,
@@ -459,12 +535,19 @@ def runWithConfig(
     # Step 1: validate config and binary
     if not validate_config_and_binary(config_file, bin_path):
         return False
+    input_problems = check_input_files(config_file)
+    if input_problems:
+        for problem in input_problems:
+            logger.error(problem)
+        logger.error("UDLF was not executed: invalid input.")
+        return False
 
     # Step 2: run platform
-    run_ok, log_out_path = run_platform(config_file, bin_path)
-    if run_ok:
+    failed, udlf_output = run_platform(config_file, bin_path)
+    if failed:
         logger.error("UDLF execution failed.")
         return False
+    output.stdout = udlf_output
     logger.info("pyUDLF execution complete!")
 
     # Step 3: parse config + log if requested
@@ -478,7 +561,7 @@ def runWithConfig(
             output.classes_path = params["classes_path"]
             output.list_path = params["list_path"]
             output.images_path = params["images_path"]
-            output.log_dict = parser.parse_log_and_cleanup(log_out_path)
+            output.log_dict = readData.parse_log(udlf_output)
         except Exception as e:
             logger.error(f"Error parsing config file {config_file}: {e}")
             return False

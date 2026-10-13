@@ -32,6 +32,7 @@ class OutputType:
         self.images_path: Optional[str] = path
         self.list_path: Optional[str] = path
         self.classes_path: Optional[str] = path
+        self.stdout: str = ""  # everything UDLF printed during the run
 
         logger.debug("OutputType initialized with base path: %r", path)
 

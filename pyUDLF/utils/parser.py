@@ -10,6 +10,30 @@ from pyUDLF.utils import readData
 # Module-level logger (public lib style: no handler here)
 logger = logging.getLogger(__name__)
 
+
+def read_config_values(config_file: str) -> dict:
+    """
+    Read a UDLF config file exactly as the UDLF binary does: spaces and tabs
+    are removed, everything after '#' is a comment, the name ends at the first
+    '=' and, when a variable is declared twice, the last value wins.
+
+    Args:
+        config_file (str): Path to the configuration file.
+
+    Returns:
+        dict: {variable name: value as string}
+    """
+    values = {}
+    with open(config_file, "r") as f:
+        for line in f:
+            line = line.replace(" ", "").replace("\t", "").rstrip("\r\n")
+            line = line.split("#", 1)[0]
+            if "=" in line:
+                name, value = line.split("=", 1)
+                values[name] = value
+    return values
+
+
 def parse_config(config_file: str) -> dict:
     """
     Parse a UDLF configuration file into a dictionary of parameters.
@@ -82,23 +106,3 @@ def parse_config(config_file: str) -> dict:
             params["log_path"] = line.split("=")[1].split("#")[0].strip()
 
     return params
-    
-    
-def parse_log_and_cleanup(log_out_path: str) -> dict:
-    """
-    Read execution log and remove temporary log file.
-
-    Args:
-        log_out_path (str): Path to the temporary log file.
-
-    Returns:
-        dict: Parsed log dictionary.
-    """
-    try:
-        log_dict = readData.read_log(log_out_path)
-        os.remove(log_out_path)
-        logger.debug(f"Temporary log file removed: {log_out_path}")
-        return log_dict
-    except Exception as e:
-        logger.error(f"Failed to read or remove log file {log_out_path}: {e}")
-        return {}

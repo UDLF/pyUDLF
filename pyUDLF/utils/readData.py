@@ -30,10 +30,25 @@ def read_config(path):
 
 def read_log(path):
     """
-    Read config results and return
+    Read a UDLF log file and return its results
 
     Parameters:
-        path -> log path to read, same as config path
+        path -> log path to read (OUTPUT_LOG_FILE_PATH)
+
+    Returns:
+        log_parameters -> dictionary with results
+    """
+    with open(path, 'r') as f:
+        return parse_log(f.read())
+
+
+def parse_log(text):
+    """
+    Parse the results of a UDLF log, given as text (the log file contents or
+    everything UDLF printed, which ends with the log)
+
+    Parameters:
+        text -> log text
 
     Returns:
         log_parameters -> dictionary with results
@@ -45,60 +60,58 @@ def read_log(path):
     parametros = []
     metodo = "NONE"
 
-    with open(path, 'r') as f:
-        lines = [x.strip() for x in f.readlines()]
+    lines = [x.strip() for x in text.splitlines()]
+    for i in range(len(lines)):
+        if "Task" in lines[i]:
+            line = lines[i].split(':')
+            metodo = line[1].strip()
 
-        for i in range(len(lines)):
-            if "Task" in lines[i]:
-                line = lines[i].split(':')
-                metodo = line[1].strip()
+        if "Time" in lines[i]:
+            line = lines[i].split(':')
+            log_parameters["Time"] = line[1]
 
-            if "Time" in lines[i]:
-                line = lines[i].split(':')
-                log_parameters["Time"] = line[1]
-
-            if metodo == "FUSION":
-                if "Effectiveness" in lines[i]:
+        if metodo == "FUSION":
+            if "Effectiveness" in lines[i]:
+                i = i + 1
+                while("-" not in lines[i]):
+                    line = lines[i].split()
+                    parametros.append(line[0])
+                    before.append(line[1])
                     i = i + 1
-                    while("-" not in lines[i]):
-                        line = lines[i].split()
-                        parametros.append(line[0])
-                        before.append(line[1])
-                        i = i + 1
-                    j = 0
-                    for j in range(len(parametros)):
-                        log_parameters[parametros[j]] = before[j]
+                j = 0
+                for j in range(len(parametros)):
+                    log_parameters[parametros[j]] = before[j]
 
-            else:
-                if "Before" in lines[i]:
+        else:
+            if "Before" in lines[i]:
+                i = i + 1
+                while ("After" not in lines[i]):
+                    line = lines[i].split()
+                    parametros.append(line[0])
+                    before.append(line[1])
+                    # log_parameters[line[0]] = line[1]
                     i = i + 1
-                    while ("After" not in lines[i]):
-                        line = lines[i].split()
-                        parametros.append(line[0])
-                        before.append(line[1])
-                        # log_parameters[line[0]] = line[1]
-                        i = i + 1
 
+                i = i + 1
+                while ("Relative Gains" not in lines[i]):
+                    line = lines[i].split()
+                    after.append(line[1])
                     i = i + 1
-                    while ("Relative Gains" not in lines[i]):
-                        line = lines[i].split()
-                        after.append(line[1])
-                        i = i + 1
 
+                i = i + 1
+                j = 0
+                while (j < len(parametros)):
+                    line = lines[i].split()
+                    gains.append(line[1])
                     i = i + 1
-                    j = 0
-                    while (j < len(parametros)):
-                        line = lines[i].split()
-                        gains.append(line[1])
-                        i = i + 1
-                        j = j + 1
+                    j = j + 1
 
-                    j = 0
-                    for j in range(len(parametros)):
-                        log_parameters[parametros[j]] = dict(
-                            [("Before", before[j]),
-                             ("After", after[j]),
-                             ("Gain", gains[j])])
+                j = 0
+                for j in range(len(parametros)):
+                    log_parameters[parametros[j]] = dict(
+                        [("Before", before[j]),
+                         ("After", after[j]),
+                         ("Gain", gains[j])])
     return log_parameters
 
 

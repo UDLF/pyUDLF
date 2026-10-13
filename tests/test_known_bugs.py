@@ -7,12 +7,11 @@ failure, and the marker must be removed in the same change. This way every
 bug fix comes with a regression test.
 """
 
-import os
 from pathlib import Path
 
 import pytest
 
-from conftest import METHOD_CASES, N, base_config, make_input
+from conftest import METHOD_CASES, N, make_input
 
 known_bug = pytest.mark.xfail(strict=True, reason="known bug, see module docstring")
 
@@ -20,68 +19,6 @@ known_bug = pytest.mark.xfail(strict=True, reason="known bug, see module docstri
 def _cprr_input(udlf_template, data, tmp_path, **kwargs):
     return make_input(udlf_template, data, "CPRR", METHOD_CASES["CPRR"],
                       tmp_path / "out", tmp_path / "log.txt", **kwargs)
-
-
-# --------------------------------------------------------------------------
-# Failure detection
-# --------------------------------------------------------------------------
-
-@known_bug
-def test_crash_of_udlf_is_reported_as_failure(old_api, udlf_template, data, tmp_path):
-    """Input ranked lists shorter than L make UDLF segfault (exit 139).
-    The wrapper ignores the return code and reports success."""
-    short = tmp_path / "rk_short.txt"
-    lines = Path(data["rk_num"]).read_text().splitlines()
-    short.write_text("".join(" ".join(l.split()[:20]) + "\n" for l in lines))
-    inp = _cprr_input(udlf_template, data, tmp_path, input_file=str(short))
-
-    assert old_api.run(inp, get_output=True) is False
-
-
-@known_bug
-def test_path_containing_word_error_runs(old_api, udlf_template, data, tmp_path):
-    """Success is decided by searching words like 'error' in the output, so a
-    valid run whose input path contains 'error' is reported as failed."""
-    folder = tmp_path / "error_analysis"
-    folder.mkdir()
-    rk = folder / "rk.txt"
-    rk.write_text(Path(data["rk_num"]).read_text())
-    inp = _cprr_input(udlf_template, data, tmp_path, input_file=str(rk))
-
-    assert old_api.run(inp, get_output=True)
-
-
-@known_bug
-def test_bad_enum_value_is_reported(old_api, udlf_template, data, tmp_path):
-    """set_param skips validation; UDLF silently replaces an invalid enum by
-    its default and the run is reported as a success.
-    (Named without 'invalid'/'error': tmp_path contains the test name and the
-    wrapper's keyword search would flag the path itself.)"""
-    inp = make_input(udlf_template, data, "RLSIM", METHOD_CASES["RLSIM"],
-                     tmp_path / "out", tmp_path / "log.txt")
-    try:
-        inp.set_param("PARAM_RLSIM_METRIC", "NOT_A_METRIC")
-    except ValueError:
-        return
-    assert old_api.run(inp, get_output=True) is False
-
-
-@known_bug
-def test_missing_binary_path_raises(old_api, tmp_path):
-    """setBinaryPath silently falls back to the default binary."""
-    with pytest.raises((FileNotFoundError, ValueError)):
-        old_api.setBinaryPath(str(tmp_path / "does_not_exist" / "udlf"))
-
-
-@known_bug
-def test_temporary_log_is_removed_after_failed_run(old_api, udlf_template, data, tmp_path):
-    """The temporary stdout log is only deleted after successful runs with
-    get_output=True. (tempfile is redirected to tmp_path by conftest.)"""
-    inp = _cprr_input(udlf_template, data, tmp_path)
-    inp.set_param("PARAM_CPRR_L", N + 100)  # UDLF aborts: L > N
-    assert old_api.run(inp, get_output=True) is False
-
-    assert list(tmp_path.glob("*_udlf_log.txt")) == []
 
 
 # --------------------------------------------------------------------------

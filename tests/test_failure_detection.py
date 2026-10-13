@@ -79,16 +79,15 @@ def test_udlf_abort_is_reported(old_api, udlf_template, data, tmp_path, caplog):
     assert "K can't be greater than L" in caplog.text  # tail of UDLF output
 
 
-def test_value_replaced_by_default_is_reported(old_api, udlf_template, data, tmp_path,
-                                               caplog):
-    inp = make_input(udlf_template, data, "RLSIM", METHOD_CASES["RLSIM"],
-                     tmp_path / "out", tmp_path / "log.txt")
-    try:
-        inp.set_param("PARAM_RLSIM_METRIC", "NOT_A_METRIC")
-    except ValueError:
-        return  # rejected even earlier, also fine
-    assert old_api.run(inp, get_output=True) is False
-    assert "PARAM_RLSIM_METRIC" in caplog.text
+def test_value_replaced_by_default_is_reported(old_api, data, tmp_path, caplog):
+    """A user config with an invalid enum: UDLF uses the default and exits 0.
+    (set_param rejects such values earlier; a config file bypasses it.)"""
+    params = dict(METHOD_CASES["RLSIM"], PARAM_RLSIM_METRIC="NOT_A_METRIC")
+    cfg = tmp_path / "user_config.ini"
+    cfg.write_text(base_config(data, "RLSIM", params, tmp_path / "out", tmp_path / "log"))
+
+    assert old_api.runWithConfig(str(cfg), get_output=True) is False
+    assert "PARAM_RLSIM_METRIC = 'NOT_A_METRIC'" in caplog.text
 
 
 def test_no_temporary_files_are_left(old_api, udlf_template, data, tmp_path):

@@ -119,8 +119,8 @@ def new_parameters(param, value, parameters, list_parameters):
     """
     param = param.upper().strip()
     if param not in list_parameters:
-        list = [value]
-        parameters[param] = list
+        # values are stored as text, as when read from a config file
+        parameters[param] = [str(value)]
         list_parameters.append(param)
     else:
         print("Parameters already exist")

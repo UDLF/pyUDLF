@@ -10,6 +10,20 @@ import numpy as np
 logger = get_logger(__name__)
 
 
+def _matches_type(value, expected_type) -> bool:
+    """Type check for method parameters: an int is a valid float, and a bool
+    is never a number (in Python, bool is a subclass of int)."""
+    if expected_type is bool:
+        return isinstance(value, (bool, np.bool_))
+    if isinstance(value, (bool, np.bool_)):
+        return False
+    if expected_type is int:
+        return isinstance(value, (Integral, np.integer))
+    if expected_type is float:
+        return isinstance(value, (Integral, float, np.integer, np.floating))
+    return isinstance(value, expected_type)
+
+
 def _as_ranked_lists_matrices(value):
     """
     If value holds in-memory ranked lists, return them as a list of matrices
@@ -167,7 +181,8 @@ class InputType:
             else:
                 raise ValueError(f"{key} must be a list[int] or CSV string, got {type(normalized)}")
 
-        configGenerator.setParameter(key, normalized, self.parameters)
+        # known UDLF parameters missing from the template config are added
+        configGenerator._set_or_add(key, normalized, self.parameters, self.list_parameters)
         logger.debug("%s set to %r", key, normalized)
 
     def set_method_name(self, value: str) -> None:
@@ -612,9 +627,15 @@ class InputType:
         Args:
             param (str): parameter name (must not be empty).
             value: parameter value.
+
+        Raises:
+            ValueError: if the parameter already exists (use set_param).
         """
         if not isinstance(param, str) or not param.strip():
             raise ValueError("Parameter name must be a non-empty string.")
+        if param.upper().strip() in self.parameters:
+            raise ValueError(f"{param.upper().strip()} already exists. Use set_param() "
+                             "to change its value.")
         configGenerator.new_parameters(
             param, value, self.parameters, self.list_parameters
         )
@@ -653,55 +674,69 @@ class InputType:
         """
         Change the value of an existing parameter.
 
+        Values of known UDLF parameters are validated (type, allowed values)
+        and normalized, as in the specific setters.
+
         Args:
             param (str): name of the parameter to change (must exist).
             value: new value for the parameter.
+
+        Raises:
+            KeyError: if the parameter is not in the config
+                      (use add_new_parameter to add it).
+            ValueError: if the value is not valid for the parameter.
         """
         if not isinstance(param, str) or not param.strip():
             raise ValueError("Parameter name must be a non-empty string.")
-        configGenerator.setParameter(param, value, self.parameters)
+        name = param.upper().strip()
+        if name not in self.parameters:
+            raise KeyError(f"{name} is not in the config. "
+                           "Use add_new_parameter() to add a new parameter.")
+        self._set_validated(name, value)
     
-    def set_method_parameters(self, method: str, **kwargs) -> None:
+    def set_method_parameters(self, method: str, reset_defaults: bool = False,
+                              **kwargs) -> None:
         """
-        Set multiple parameters for a specific UDLF method in one call.
+        Set several parameters of a UDLF method in one call.
 
-        This function allows configuring all parameters related to a given method
-        (e.g., CPRR, RFE, RDPAC) at once. Missing parameters are automatically
-        filled with their default values, as defined in METHOD_PARAMS.
+        Only the parameters passed are changed; the others keep their current
+        values. With reset_defaults=True, every parameter not passed is set to
+        its default value (as defined in METHOD_PARAMS).
 
         Args:
             method (str): the method name (e.g., "CPRR", "RFE", "RDPAC").
-            **kwargs: key-value pairs of parameters specific to the method.
-                The keys must match the shorthand names defined in METHOD_PARAMS.
+            reset_defaults (bool): reset the parameters not passed to defaults.
+            **kwargs: parameters of the method, by the short names defined in
+                METHOD_PARAMS (case-insensitive).
 
                 Example:
-                    set_method_parameters("CPRR", k=10, alpha=0.5)
+                    set_method_parameters("CPRR", l=400, k=20)
 
         Raises:
-            ValueError: if the method is not supported, or if an invalid parameter
-                        name is provided in kwargs.
+            ValueError: if the method is not supported, a parameter name is
+                        unknown, or a value has the wrong type.
         """
         method = method.upper()
         if method not in METHOD_PARAMS:
             raise ValueError(f"Unsupported method: {method}")
 
         param_map = METHOD_PARAMS[method]
+        given = {key.lower(): value for key, value in kwargs.items()}
+        unknown = sorted(set(given) - set(param_map))
+        if unknown:
+            raise ValueError(f"Unknown parameter(s) {unknown} for method {method}. "
+                             f"Valid names: {sorted(param_map)}")
 
-        # for key, spec in param_map.items():
-        #     if key in kwargs:
-        #         value = kwargs[key]
-        #     else:
-        #         value = spec.get("default")
-        #     self._set_validated(spec["param"], value)
         for key, spec in param_map.items():
-            if key in kwargs:
-                value = kwargs[key]
-            else:
+            if key in given:
+                value = given[key]
+            elif reset_defaults:
                 value = spec.get("default")
+            else:
+                continue
 
-            # type verification
             expected_type = spec.get("type")
-            if expected_type is not None and not isinstance(value, expected_type):
+            if expected_type is not None and not _matches_type(value, expected_type):
                 raise ValueError(
                     f"Invalid type for parameter '{key}' in method {method}. "
                     f"Expected {expected_type.__name__}, got {type(value).__name__}."

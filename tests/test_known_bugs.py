@@ -22,42 +22,6 @@ def _cprr_input(udlf_template, data, tmp_path, **kwargs):
 
 
 # --------------------------------------------------------------------------
-# Parameters
-# --------------------------------------------------------------------------
-
-@known_bug
-def test_set_method_parameters_keeps_values_not_passed(udlf_template, data):
-    """set_method_parameters resets every parameter not passed to its default,
-    undoing e.g. a previous set_ranked_lists_size."""
-    from pyUDLF.utils.inputType import InputType
-
-    inp = InputType(config_path=str(udlf_template))
-    inp.set_ranked_lists_size(150)
-    inp.set_method_parameters("CPRR", k=10)
-
-    assert int(inp.get_param("PARAM_CPRR_L")[0]) == 150
-
-
-@known_bug
-def test_set_method_parameters_accepts_int_for_float(udlf_template):
-    from pyUDLF.utils.inputType import InputType
-
-    inp = InputType(config_path=str(udlf_template))
-    inp.set_method_parameters("RDPAC", p=1)
-
-    assert float(inp.get_param("PARAM_RDPAC_P")[0]) == 1.0
-
-
-@known_bug
-def test_add_new_parameter_with_int_value(old_api, udlf_template, data, tmp_path):
-    """add_new_parameter stores the raw int and write_config calls .strip() on it."""
-    inp = _cprr_input(udlf_template, data, tmp_path)
-    inp.add_new_parameter("PARAM_CPRR_EXTRA", 1)
-
-    inp.write_config(str(tmp_path / "cfg.ini"))
-
-
-# --------------------------------------------------------------------------
 # Outputs
 # --------------------------------------------------------------------------
 

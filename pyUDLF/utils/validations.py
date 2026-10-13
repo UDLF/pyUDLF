@@ -6,6 +6,8 @@ Generated from config.ini specification.
 from pyUDLF.utils.logger import get_logger
 from pathlib import Path
 
+import numpy as np
+
 logger = get_logger(__name__)
 
 VALIDATIONS = {
@@ -233,8 +235,7 @@ def validate_param(key: str, value):
     # ENUM
     if t == "enum":
         if isinstance(value, str):
-            val = value.upper()
-            #print(f"DEBUG validate_param: key={key}, raw={value}, normalized={val}, allowed={rules['values']}")
+            val = value.strip().upper()
             if val in rules["values"]:
                 return val
         raise ValueError(f"Invalid value '{value}' for {key}. Allowed: {rules['values']}")
@@ -242,21 +243,25 @@ def validate_param(key: str, value):
     # BOOL
     if t == "bool":
         if isinstance(value, str):
-            val = value.upper()
+            val = value.strip().upper()
             if val in {"TRUE", "FALSE"}:
                 return val
         if isinstance(value, bool):
             return "TRUE" if value else "FALSE"
         raise ValueError(f"Invalid value '{value}' for {key}. Must be TRUE/FALSE.")
 
-    # UINT
+    # UINT (int, numpy integer or a string of digits; bool is not a number here)
     if t == "uint":
-        if isinstance(value, int) and value >= 0:
-            return value
+        if isinstance(value, str) and value.strip().isdigit():
+            return int(value.strip())
+        if isinstance(value, (int, np.integer)) and not isinstance(value, bool) and value >= 0:
+            return int(value)
         raise ValueError(f"Invalid value '{value}' for {key}. Must be unsigned integer.")
 
-    # FLOAT
+    # FLOAT (any real number or numeric string; bool is not a number here)
     if t == "float":
+        if isinstance(value, bool):
+            raise ValueError(f"Invalid value '{value}' for {key}. Must be float.")
         try:
             f = float(value)
         except Exception:

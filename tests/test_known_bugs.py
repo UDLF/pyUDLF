@@ -22,37 +22,6 @@ def _cprr_input(udlf_template, data, tmp_path, **kwargs):
 
 
 # --------------------------------------------------------------------------
-# Inputs
-# --------------------------------------------------------------------------
-
-@known_bug
-def test_in_memory_ranked_lists_are_accepted(udlf_template, data):
-    """InputType documents list[list] input, but write_input_files calls
-    os.path.join with an int and raises TypeError."""
-    from pyUDLF.utils.inputType import InputType
-
-    rks = [[int(x) for x in line.split()]
-           for line in Path(data["rk_num"]).read_text().splitlines()]
-    inp = InputType(config_path=str(udlf_template))
-    inp.set_input_files([rks])
-
-    assert Path(inp.get_input_files()).is_file()
-
-
-@known_bug
-def test_fusion_sets_number_of_input_files(udlf_template, data):
-    """With 3 fusion inputs NUM_INPUT_FUSION_FILES stays at the template value
-    (2), so UDLF only reads the first two files."""
-    from pyUDLF.utils.inputType import InputType
-
-    inp = InputType(config_path=str(udlf_template))
-    inp.set_input_files([data["rk_num"], data["rk_num"], data["rk_num"]])
-
-    assert inp.get_task()[0].strip() == "FUSION"
-    assert int(inp.get_param("NUM_INPUT_FUSION_FILES")[0]) == 3
-
-
-# --------------------------------------------------------------------------
 # Parameters
 # --------------------------------------------------------------------------
 

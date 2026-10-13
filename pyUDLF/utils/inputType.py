@@ -5,7 +5,49 @@ from pyUDLF.utils.logger import get_logger
 from pyUDLF.utils.validations import validate_param, validate_path, METHOD_PARAMS
 from pyUDLF.utils.visualization import render_ranked_list
 from pathlib import Path
+from numbers import Integral
+import numpy as np
 logger = get_logger(__name__)
+
+
+def _as_ranked_lists_matrices(value):
+    """
+    If value holds in-memory ranked lists, return them as a list of matrices
+    (one per input file). Return None for paths and lists of paths.
+
+    Accepted: a 2D array / list of rows (one matrix), a 3D array or a list of
+    those (several matrices, FUSION).
+
+    Raises:
+        ValueError: if the ranked lists are not integer indices.
+    """
+    if isinstance(value, np.ndarray):
+        if value.ndim == 2:
+            matrices = [value]
+        elif value.ndim == 3:
+            matrices = list(value)
+        else:
+            raise ValueError(f"In-memory ranked lists must be 2D or 3D, got {value.ndim}D.")
+    elif isinstance(value, list) and value and not isinstance(value[0], (str, os.PathLike)):
+        first = value[0]
+        if isinstance(first, np.ndarray) and first.ndim == 2:
+            matrices = value
+        elif isinstance(first, (list, tuple)) and first and \
+                isinstance(first[0], (list, tuple, np.ndarray)):
+            matrices = value
+        else:
+            matrices = [value]
+    else:
+        return None
+
+    for matrix in matrices:
+        first_row = matrix[0]
+        if len(first_row) == 0 or not all(isinstance(x, (Integral, np.integer))
+                                          for x in first_row):
+            raise ValueError(
+                "In-memory input must be ranked lists of integer image indices "
+                "(one row per query). Write matrices to a file and pass its path.")
+    return matrices
 
 class InputType:
     """
@@ -85,38 +127,10 @@ class InputType:
         Raises:
             ValueError: if the input_files_list type is not supported.
         """
-        if not self.input_files_list:
+        if self.input_files_list is None or len(self.input_files_list) == 0:
             logger.warning("Input files list is empty. Nothing to initialize.")
             return
-
-        # Case 1: single path
-        if isinstance(self.input_files_list, str):
-            logger.debug("Initializing data with a single path.")
-            self.set_input_files(self.input_files_list)
-            return
-
-        # Case 2: list input
-        if isinstance(self.input_files_list, list):
-            first_elem = self.input_files_list[0]
-
-            # Case 2a: list of paths
-            if isinstance(first_elem, str):
-                logger.debug("Initializing data with a list of paths.")
-                self.set_input_files(self.input_files_list)
-                return
-
-            # Case 2b: list of lists
-            if isinstance(first_elem, list):
-                logger.debug("Initializing data with a list of ranked lists (will be written to disk).")
-                aux = os.path.dirname(self.config_path)
-                data_paths = configGenerator.write_input_files(
-                    self.input_files_list, aux
-                )
-                self.set_input_files(data_paths)
-                return
-
-        # Case not recognized
-        logger.error("Unsupported type for input_files_list: %s", type(self.input_files_list))
+        self.set_input_files(self.input_files_list)
 
     def _set_validated(self, key: str, value):
         """
@@ -471,18 +485,34 @@ class InputType:
         Set the input files.
 
         Accepts:
-            - str: path to a single file.
-            - list[str]: multiple file paths (fusion).
-            - list[list]: ranked lists to be written to disk.
+            - str: path to a single file (UDL task).
+            - list[str]: multiple file paths (FUSION task when 2 or more).
+            - in-memory ranked lists (integer indices, one row per query):
+              a list of rows or a 2D numpy array (UDL task), or a list of
+              those (FUSION task). They are written to text files in a new
+              temporary directory, and the input format is set to RK / NUM.
 
         Raises:
             TypeError: if value type is unsupported.
             ValueError: if list is empty or contains invalid paths.
         """
+        if isinstance(value, os.PathLike):
+            value = os.fspath(value)
+
+        matrices = _as_ranked_lists_matrices(value)
+        if matrices is not None:
+            data_paths = configGenerator.write_input_files(matrices)
+            logger.info("In-memory ranked lists written to %s",
+                        os.path.dirname(data_paths[0]))
+            self.set_input_files(data_paths)
+            self._set_validated("INPUT_FILE_FORMAT", "RK")
+            self._set_validated("INPUT_RK_FORMAT", "NUM")
+            return
+
         if not isinstance(value, (str, list)):
             raise TypeError(
                 f"Invalid input type for set_input_files: {type(value)}. "
-                "Must be str, list[str], or list[list]."
+                "Must be str, list[str], or in-memory ranked lists."
             )
 
         self.input_files_list = value
@@ -492,14 +522,10 @@ class InputType:
             if len(value) == 0:
                 raise ValueError("Input file list cannot be empty.")
 
-            # Case 1a: list of lists -> write them as files first
-            if isinstance(value[0], list):
-                aux = os.path.dirname(self.config_path)
-                data_paths = configGenerator.write_input_files(self.input_files_list, aux)
-                self.set_input_files(data_paths)
-                return
+            value = [os.fspath(v) if isinstance(v, os.PathLike) else v for v in value]
+            self.input_files_list = value
 
-            # Case 1b: list of strings -> validate each path
+            # list of strings -> validate each path
             if not all(isinstance(elem, str) for elem in value):
                 raise TypeError("All elements of input_files_list must be strings.")
 
@@ -595,15 +621,20 @@ class InputType:
 
     def add_input_files(self, value) -> None:
         """
-        Add new input files in fusion mode.
+        Add new input files in fusion mode, after the ones already set.
 
         Args:
             value (str | list): new file(s) to add.
+
+        Raises:
+            ValueError: if the task is not FUSION or a path does not exist.
         """
         if not isinstance(value, (str, list)):
             raise TypeError(
                 f"Invalid type for input files: {type(value)}. Must be str or list."
             )
+        for path in [value] if isinstance(value, str) else value:
+            validate_path(path, must_exist=True)
         configGenerator.new_fusion_parameter(
             value, self.parameters, self.list_parameters
         )

@@ -2,6 +2,7 @@ from pyUDLF.utils import readData
 from pyUDLF.utils import writeData
 import os.path
 import re
+import tempfile
 
 
 def initParameters(config_path, parameters, list_parameters):
@@ -27,22 +28,34 @@ def initParameters(config_path, parameters, list_parameters):
     return parameters, list_parameters
 
 
-def write_input_files(data, path):
+def write_input_files(data, path=None):
+    """
+    Write in-memory ranked lists to text files that UDLF can read.
+
+    Parameters:
+        data -> list of ranked lists matrices (one per input file); each matrix
+                is a list of rows (or a 2D numpy array) of image indices
+        path -> directory for the files; a new temporary directory if None
+
+    Returns:
+        data_paths -> list with the path of each written file
+    """
+    if path is None:
+        path = tempfile.mkdtemp(prefix="pyudlf_inputs_")
+    os.makedirs(path, exist_ok=True)
+
     data_paths = []
     cont = 1
-    for i in range(len(data)):
-        temp = os.path.join("/rks_", cont)
-        aux = os.path.join(path, temp)
+    for matrix in data:
+        aux = os.path.join(path, f"rks_{cont}.txt")
         while os.path.isfile(aux):
             cont = cont + 1
-            temp = os.path.join("/rks_", cont)
-            aux = os.path.join(path, temp)
+            aux = os.path.join(path, f"rks_{cont}.txt")
 
+        writeData.write_data(matrix, aux)
         data_paths.append(aux)
-        writeData.write_data(data[i], data_paths[i])
-        cont = cont+1
+        cont = cont + 1
 
-    # print(data_paths)
     return data_paths
 
 
@@ -214,13 +227,25 @@ def set_input(value, parameters, list_parameters):
             setParameter(
                 "UDL_TASK", "FUSION", parameters)
             for i in range(len(value)):
-                aux = "INPUT_FILES_FUSION_{}".format(i+1)
-                if aux in list_parameters:
-                    setParameter(
-                        aux, value[i], parameters)
-                else:
-                    new_parameters(
-                        aux, value[i], parameters, list_parameters)
+                _set_or_add("INPUT_FILES_FUSION_{}".format(i+1), value[i],
+                            parameters, list_parameters)
+            # UDLF only reads the first NUM_INPUT_FUSION_FILES files
+            _set_or_add("NUM_INPUT_FUSION_FILES", len(value), parameters, list_parameters)
+
+
+def _set_or_add(param, value, parameters, list_parameters):
+    """Set a parameter, adding it to the config if it does not exist yet."""
+    if param in parameters:
+        setParameter(param, value, parameters)
+    else:
+        new_parameters(param, str(value), parameters, list_parameters)
+
+
+def _num_fusion_files(parameters):
+    try:
+        return int(str(parameters["NUM_INPUT_FUSION_FILES"][0]).strip())
+    except (KeyError, ValueError):
+        return 0
 
 
 def set_all_ranked_lists_size(value, parameters, list_parameters):
@@ -236,53 +261,43 @@ def set_all_ranked_lists_size(value, parameters, list_parameters):
 
 def get_input_files_parameters(parameters, list_parameters):
     """
+    Return the input file (UDL task) or the list of input files (FUSION task).
     """
-    i = 1
     fusion_files = []
-    flag = True
     task = getParameter("UDL_TASK", parameters)
     task = task[0].strip()
     if task == "UDL":
         return getParameter("INPUT_FILE", parameters)[0].strip()
     if task == "FUSION":
-        while (flag):
+        # only the first NUM_INPUT_FUSION_FILES are used by UDLF
+        for i in range(1, _num_fusion_files(parameters) + 1):
             aux = "INPUT_FILES_FUSION_{}".format(i)
             if aux in list_parameters:
                 fusion_files.append(getParameter(aux, parameters)[0].strip())
-            else:
-                flag = False
-            i = i + 1
         return fusion_files
 
 
 def new_fusion_parameter(value, parameters, list_parameters):
     """
+    Append input files to a FUSION task (after the files already set).
     """
-    if (parameters["UDL_TASK"][0] == "UDL"):
-        print("ERROR, not fusion")
-        return
+    if parameters["UDL_TASK"][0].strip() != "FUSION":
+        raise ValueError("add_input_files requires UDL_TASK = FUSION. "
+                         "Use set_input_files([file1, file2, ...]) first.")
 
-    i = 0
     if isinstance(value, str):
-        tam = 1
         aux_value = [value]
     elif isinstance(value, list):
         aux_value = value
-        tam = len(value)
     else:
-        print("Type Error !")
-        return
+        raise TypeError(f"Invalid type for input files: {type(value)}")
 
-    cont = 0
-
-    while (i < tam):
-        aux = "INPUT_FILES_FUSION_{}".format(cont+1)
-        cont = cont + 1
-
-        if (aux not in list_parameters):
-            new_parameters(aux, aux_value[i], parameters, list_parameters)
-            i = i + 1
-            # print(parameters[aux])
+    count = _num_fusion_files(parameters)
+    for path in aux_value:
+        count += 1
+        _set_or_add("INPUT_FILES_FUSION_{}".format(count), path,
+                    parameters, list_parameters)
+    _set_or_add("NUM_INPUT_FUSION_FILES", count, parameters, list_parameters)
 
 
 def list_info_selected_method(method, parameters, list_parameters):

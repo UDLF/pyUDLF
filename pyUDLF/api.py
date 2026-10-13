@@ -21,7 +21,7 @@ from pathlib import Path
 
 import numpy as np
 
-from pyUDLF import run_calls
+from pyUDLF import install, run_calls
 from pyUDLF.errors import UDLFError, UDLFNotFoundError, UDLFParamError, UDLFRunError
 from pyUDLF.utils import evaluation, parser, readData
 from pyUDLF.utils.validations import (METHOD_PARAMS, VALIDATIONS, matches_type,
@@ -457,13 +457,12 @@ def _find_binary(bin_path):
     elif os.environ.get("UDLF_BIN"):
         path, origin = os.path.expanduser(os.environ["UDLF_BIN"]), "UDLF_BIN"
     else:
-        path, origin = run_calls.bin_path, "default location"
+        path, origin = str(install.default_binary_path()), "default location"
     if not os.path.isfile(path):
-        raise UDLFNotFoundError(
-            f"UDLF binary not found at {path} ({origin}). Build it with "
-            "scripts/build_udlf.sh (in the pyUDLF repository), or download a release "
-            "from https://github.com/UDLF/UDLF/releases, then pass bin_path= or set "
-            "the UDLF_BIN environment variable.")
+        hint = ("Install the official release with `pyudlf download` (or "
+                "pyUDLF.install.download_udlf()), or " + install.BUILD_HINT[0].lower()
+                + install.BUILD_HINT[1:]) if origin == "default location" else install.BUILD_HINT
+        raise UDLFNotFoundError(f"UDLF binary not found at {path} ({origin}). {hint}")
     return path
 
 

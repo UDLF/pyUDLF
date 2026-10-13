@@ -1,32 +1,21 @@
 import os
 import re
-import requests
-import tarfile
 import tempfile
 from pathlib import Path
 import subprocess
+from pyUDLF import install
+from pyUDLF.errors import UDLFError
 from pyUDLF.utils import readData, outputType, evaluation, parser
 import sys
-import zipfile
 from pyUDLF.utils.logger import get_logger
 
-
-# ---------- Logger configuration ----------
-# logger = logging.getLogger(__name__)
-# if not logger.hasHandlers(): 
-#     handler = logging.StreamHandler()
-#     formatter = logging.Formatter("[%(levelname)s] %(message)s")
-#     handler.setFormatter(formatter)
-#     logger.addHandler(handler)
-#     logger.setLevel(logging.INFO)
 logger = get_logger(__name__)
 
 # ---------- Paths ----------
-user_home = Path.home()
-pyudlf_dir = user_home / ".pyudlf"
+pyudlf_dir = install.pyudlf_home()  # ~/.pyudlf or PYUDLF_HOME
 udlf_install_path = pyudlf_dir / "bin"
 
-bin_path = str(udlf_install_path / "udlf")
+bin_path = str(install.default_binary_path())
 # Template of new InputType objects: the reference config.ini of UDLF v1.70,
 # shipped with pyUDLF, so the defaults do not depend on a downloaded file.
 bundled_config_path = str(Path(__file__).resolve().parent / "data" / "config.ini")
@@ -34,7 +23,6 @@ config_path = bundled_config_path
 
 original_bin_path = bin_path
 original_config_path = config_path
-compressed_binary_path = str(pyudlf_dir / "udlf_bin.tar.gz")
 
 # ---------- Detect OS ----------
 if sys.platform.startswith("linux"):
@@ -42,12 +30,11 @@ if sys.platform.startswith("linux"):
 elif sys.platform.startswith("win"):
     operating_system = "windows"
 else:
-    operating_system = "unsupported"
-    logger.warning("Unsupported operating system detected: %s", sys.platform)
-    
-# ---------- Binary URLs ----------
-udlf_urls = {"linux": "http://udlf_linux.lucasvalem.com",
-             "windows": "http://udlf_windows.lucasvalem.com"}
+    operating_system = "other"  # e.g. macOS: no official build, use your own binary
+
+# ---------- Binary URLs (official UDLF release used by default) ----------
+udlf_urls = {key.split("-")[0]: url
+             for key, (url, _) in install.RELEASES[install.DEFAULT_VERSION].items()}
 
 #---------
 def setBinaryPath(path: str) -> None:
@@ -102,110 +89,48 @@ def download_url(url: str, save_path: str, chunk_size: int = 128) -> bool:
     """
     Download a file from a given URL and save it locally.
 
-    Args:
-        url (str): URL to download the file from.
-        save_path (str): Path to save the downloaded file.
-        chunk_size (int): Size of chunks to stream the download. Default is 128.
+    Kept for compatibility; to install UDLF use pyUDLF.install.download_udlf,
+    which also checks the file against the official release.
 
     Returns:
         bool: True if download succeeded, False otherwise.
     """
-    logger.info(f"Starting download from {url}")
     try:
-        response = requests.get(url, stream=True, timeout=30)
-        response.raise_for_status()
-
-        save_path = Path(save_path)
-        save_path.parent.mkdir(parents=True, exist_ok=True)
-
-        total_size = int(response.headers.get("content-length", 0))
-        downloaded = 0
-
-        with open(save_path, "wb") as fd:
-            for chunk in response.iter_content(chunk_size=chunk_size):
-                if chunk:
-                    fd.write(chunk)
-                    downloaded += len(chunk)
-                    if total_size > 0:
-                        percent = (downloaded / total_size) * 100
-                        logger.debug(f"Downloaded {percent:.2f}%")
-
-        logger.info(f"Download complete. File saved at: {save_path}")
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        install._fetch(url, save_path)
         return True
-
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to download UDLF binary from {url}: {e}")
-        return False
-    except Exception as e:
-        logger.error(f"Unexpected error while saving binary: {e}")
+    except UDLFError as e:
+        logger.error(str(e))
         return False
 
 
 def verify_bin(config_path: str, bin_path: str) -> None:
     """
-    Verify if UDLF binary and config exist. If not, download and extract them.
+    Make sure the UDLF binary exists before running.
+
+    If the binary is missing and bin_path is the default location, the
+    official UDLF release is downloaded and installed there (checked with its
+    SHA-256). A missing binary at another path is only reported.
 
     Args:
-        config_path (str): Path to the config file.
+        config_path (str): Path to the config file (kept for compatibility).
         bin_path (str): Path to the UDLF binary.
     """
-    global operating_system
-    global compressed_binary_path
-
-    # Check if binary and config already exist
-    if os.path.isfile(bin_path) and os.path.isfile(config_path):
-        logger.info("UDLF binary and config found successfully.")
+    if os.path.isfile(bin_path):
+        logger.debug("UDLF binary found at %s", bin_path)
         return
 
-    logger.warning("UDLF binary or config is missing...")
+    if os.path.abspath(bin_path) != os.path.abspath(original_bin_path):
+        logger.error(f"UDLF binary not found at {bin_path}.")
+        return
 
-    # Ensure ~/.pyudlf directory exists
-    logger.debug(f"Ensuring installation directory exists at {pyudlf_dir}")
+    logger.warning("UDLF binary is missing. Downloading the official release "
+                   f"{install.DEFAULT_VERSION} to {pyudlf_dir} ...")
     try:
-        os.makedirs(pyudlf_dir, exist_ok=True)
-    except Exception as e:
-        logger.error(f"Could not create directory {pyudlf_dir}: {e}")
-        return
-
-    # Get download URL for the current OS
-    url = udlf_urls.get(operating_system)
-    if not url:
-        logger.error(f"No download URL available for OS: {operating_system}")
-        return
-
-    # Download the binary archive
-    logger.info(f"Attempting to download UDLF binary from {url}")
-    logger.debug(f"File will be saved to {compressed_binary_path}")
-    try:
-        download_success = download_url(url, compressed_binary_path)
-    except Exception as e:
-        logger.error(f"Could not download file due to exception: {e}")
-        return
-
-    if not download_success:
-        logger.error(f"Could not download file! Invalid URL {url}")
-        return
-
-    # Extract the binary according to the operating system
-    try:
-        if operating_system == "linux":
-            with tarfile.open(compressed_binary_path, "r:gz") as archive:
-                archive.extractall(pyudlf_dir)
-            logger.info(f"UDLF binary extracted to {pyudlf_dir} (tar.gz)")
-
-        elif operating_system == "windows":
-            with zipfile.ZipFile(compressed_binary_path, "r") as archive:
-                archive.extractall(pyudlf_dir)
-            logger.info(f"UDLF binary extracted to {pyudlf_dir} (zip)")
-
-        else:
-            logger.error(f"Unsupported operating system: {operating_system}")
-            return
-
-    except Exception as e:
-        logger.error(f"Failed to extract binary from {compressed_binary_path}: {e}")
-        return
-    logger.debug(f"Extraction complete, checking for binary at {bin_path}")
+        install.download_udlf(dest=pyudlf_dir)
+        logger.info("UDLF installed at %s", bin_path)
+    except UDLFError as e:
+        logger.error(str(e))
 
 
 def run_platform(config_file: str, bin_path: str):
@@ -252,9 +177,9 @@ def execute_udlf(config_file: str, bin_path: str, cwd: str = None):
             str: Everything UDLF printed (stdout and stderr).
             list[str]: Problems found (see verify_running); empty if the run is OK.
     """
+    # The binary is run directly (also on Windows: going through "cmd /c"
+    # would re-parse the command line and break paths with & or %)
     cmd = [bin_path, config_file]
-    if operating_system == "windows":
-        cmd = ["cmd", "/c"] + cmd
     logger.debug(f"Command: {' '.join(cmd)}")
 
     try:

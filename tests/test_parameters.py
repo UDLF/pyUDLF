@@ -54,6 +54,16 @@ def test_set_method_parameters_accepts_int_for_float(inp):
     assert float(_value(inp, "PARAM_RDPAC_P")) == 1.0
 
 
+@pytest.mark.parametrize("method, kwargs, name, stored", [
+    ("RFE", {"th_cc": 0.5}, "PARAM_RFE_TH_CC", "0.5"),        # DBL in UDLF
+    ("RDPAC", {"l_mult": 1.5}, "PARAM_RDPAC_L_MULT", "1.5"),  # DBL in UDLF
+    ("NONE", {"l": 100}, "PARAM_NONE_L", "100"),
+])
+def test_set_method_parameters_follows_udlf_types(inp, method, kwargs, name, stored):
+    inp.set_method_parameters(method, **kwargs)
+    assert _value(inp, name) == stored
+
+
 @pytest.mark.parametrize("method, kwargs", [
     ("CPRR", {"k": True}),          # bool is not an int
     ("CPRR", {"k": 2.5}),
@@ -89,6 +99,8 @@ def test_set_param_normalizes_values(inp, name, value, stored):
     ("PARAM_CPRR_K", True),
     ("OUTPUT_FILE", "yes"),
     ("PARAM_RKGRAPH_P", 2.0),  # must be in [0, 1]
+    ("EFFECTIVENESS_PRECISIONS_TO_COMPUTE", "0,5"),  # UDLF aborts on P@0
+    ("EFFECTIVENESS_RECALLS_TO_COMPUTE", []),
 ])
 def test_set_param_rejects_invalid_values(inp, name, value):
     with pytest.raises(ValueError):

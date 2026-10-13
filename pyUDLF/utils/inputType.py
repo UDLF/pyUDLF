@@ -77,8 +77,11 @@ class InputType:
         Initialize the InputType instance.
 
         Args:
-            config_path (str, optional): Path to the UDLF config file. If None,
-                                         the default from run_calls is used.
+            config_path (str, optional): Path of the config used as template
+                                         (initial values of all parameters). If
+                                         None, run_calls.config_path is used: the
+                                         UDLF v1.70 config shipped with pyUDLF,
+                                         unless changed with setConfigPath.
             input_files (str | list | list[list], optional): Input files to
                                          initialize immediately.
                                          - str: single file path
@@ -90,14 +93,9 @@ class InputType:
         self.list_parameters = []
         self.input_files_list = input_files
         self.config_path = config_path
-        # If no config path is provided, use default from run_calls
-        # and ensure the binary/config are available
         if self.config_path is None:
             self.config_path = run_calls.config_path
-            if not os.path.isfile(self.config_path):
-                logger.warning("Config is missing! Will try to install/verify UDLF assets.")
-                run_calls.verify_bin(self.config_path, run_calls.bin_path)
-            logger.info("InputType initialized.")
+            logger.debug("InputType initialized from %s", self.config_path)
 
         # Load parameters from config; abort initialization if it fails
         ok = self.init_parameters(self.config_path)  # now returns bool

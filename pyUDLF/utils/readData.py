@@ -17,15 +17,18 @@ def read_config(path):
 
     with open(path, 'r') as f:
         lines = [x.strip() for x in f.readlines()]
-        lines = [x.split('=') for x in lines]
 
     for line in lines:
-        if len(line) >= 2:
-            param = line[0].strip()
-            # value = line[1].split('#')[0]  # pega sem os comentarios
-            value = line[1].split('#')     # teste para pegar os comentarios
-            parameters[param] = value
+        # comment lines (even with '=' inside) are not parameters
+        if line.startswith('#') or '=' not in line:
+            continue
+        name, rest = line.split('=', 1)
+        param = name.strip()
+        # [value, comment]: the comment after '#' is kept for display
+        value = rest.split('#', 1)
+        if param not in parameters:
             list_parameters.append(param)
+        parameters[param] = value
 
     return parameters, list_parameters
 

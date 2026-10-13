@@ -27,7 +27,10 @@ pyudlf_dir = user_home / ".pyudlf"
 udlf_install_path = pyudlf_dir / "bin"
 
 bin_path = str(udlf_install_path / "udlf")
-config_path = str(udlf_install_path / "config.ini")
+# Template of new InputType objects: the reference config.ini of UDLF v1.70,
+# shipped with pyUDLF, so the defaults do not depend on a downloaded file.
+bundled_config_path = str(Path(__file__).resolve().parent / "data" / "config.ini")
+config_path = bundled_config_path
 
 original_bin_path = bin_path
 original_config_path = config_path

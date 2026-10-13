@@ -47,5 +47,8 @@ version = { attr = "pyUDLF.__version__" }
 [tool.setuptools.packages.find]
 include = ["pyUDLF*"]
 
+[tool.setuptools.package-data]
+pyUDLF = ["data/config.ini"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

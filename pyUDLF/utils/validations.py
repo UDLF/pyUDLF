@@ -124,7 +124,7 @@ VALIDATIONS = {
     "PARAM_RDPAC_K_INC": {"type": "uint"},
     "PARAM_RDPAC_K_START": {"type": "uint"},
     "PARAM_RDPAC_L": {"type": "uint"},
-    "PARAM_RDPAC_L_MULT": {"type": "uint"},
+    "PARAM_RDPAC_L_MULT": {"type": "float", "min": 0},
     "PARAM_RDPAC_P": {"type": "float", "min": 0, "max": 1},
     "PARAM_RDPAC_PL": {"type": "float", "min": 0, "max": 1},
 
@@ -133,7 +133,7 @@ VALIDATIONS = {
     "PARAM_RFE_T": {"type": "uint"},
     "PARAM_RFE_L": {"type": "uint"},
     "PARAM_RFE_PA": {"type": "float", "min": 0, "max": 1},
-    "PARAM_RFE_TH_CC": {"type": "uint"},
+    "PARAM_RFE_TH_CC": {"type": "float"},
     "PARAM_RFE_RERANK_BY_EMB": {"type": "bool"},
     "PARAM_RFE_EXPORT_EMBEDDINGS": {"type": "bool"},
     "PARAM_RFE_PERFORM_CCS": {"type": "bool"},
@@ -142,6 +142,9 @@ VALIDATIONS = {
 
 # parameters map for each method
 METHOD_PARAMS = {
+    "NONE": {
+        "l": {"param": "PARAM_NONE_L", "default": 1400, "type": int},
+    },
     "CONTEXTRR": {
         "l":   {"param": "PARAM_CONTEXTRR_L", "default": 25, "type": int},
         "k":   {"param": "PARAM_CONTEXTRR_K", "default": 7, "type": int},
@@ -200,7 +203,7 @@ METHOD_PARAMS = {
         "k_inc": {"param": "PARAM_RDPAC_K_INC", "default": 1, "type": int},
         "k_start": {"param": "PARAM_RDPAC_K_START", "default": 1, "type": int},
         "l": {"param": "PARAM_RDPAC_L", "default": 400, "type": int},
-        "l_mult": {"param": "PARAM_RDPAC_L_MULT", "default": 2, "type": int},
+        "l_mult": {"param": "PARAM_RDPAC_L_MULT", "default": 2, "type": float},
         "p": {"param": "PARAM_RDPAC_P", "default": 0.60, "type": float},
         "pl": {"param": "PARAM_RDPAC_PL", "default": 0.99, "type": float},
     },
@@ -209,7 +212,7 @@ METHOD_PARAMS = {
         "t": {"param": "PARAM_RFE_T", "default": 2, "type": int},
         "l": {"param": "PARAM_RFE_L", "default": 400, "type": int},
         "pa": {"param": "PARAM_RFE_PA", "default": 0.1, "type": float},
-        "th_cc": {"param": "PARAM_RFE_TH_CC", "default": 0, "type": int},
+        "th_cc": {"param": "PARAM_RFE_TH_CC", "default": 0, "type": float},
         "rerank_by_emb": {"param": "PARAM_RFE_RERANK_BY_EMB", "default": False, "type": bool},
         "export_embeddings": {"param": "PARAM_RFE_EXPORT_EMBEDDINGS", "default": False, "type": bool},
         "perform_ccs": {"param": "PARAM_RFE_PERFORM_CCS", "default": True, "type": bool},
@@ -272,20 +275,21 @@ def validate_param(key: str, value):
             raise ValueError(f"{key} must be <= {rules['max']}")
         return f
 
-    # LIST_UINT
+    # LIST_UINT (comma separated positive integers: UDLF aborts on P@0)
     if t == "list_uint":
         if isinstance(value, str):
-            items = [int(x) for x in value.split(",")]
-            if all(x >= 0 for x in items):
-                return items
-        if isinstance(value, (list, tuple)):
-            if all(isinstance(x, int) and x >= 0 for x in value):
-                return list(value)
-        raise ValueError(f"Invalid value '{value}' for {key}. Must be list of unsigned integers.")
+            parts = [x.strip() for x in value.split(",")]
+            if parts and all(x.isdigit() and int(x) > 0 for x in parts):
+                return [int(x) for x in parts]
+        if isinstance(value, (list, tuple)) and value:
+            if all(isinstance(x, (int, np.integer)) and not isinstance(x, bool) and x > 0
+                   for x in value):
+                return [int(x) for x in value]
+        raise ValueError(f"Invalid value '{value}' for {key}. "
+                         "Must be a list of positive integers.")
 
     return value
 
-from pathlib import Path
 
 def validate_path(value: str, must_exist: bool = False) -> str:
     """
@@ -299,9 +303,11 @@ def validate_path(value: str, must_exist: bool = False) -> str:
         str: the validated path.
 
     Raises:
-        ValueError: if path is invalid, contains spaces/special characters,
-                    or does not exist when must_exist=True.
+        ValueError: if path is invalid, contains characters UDLF cannot read
+                    in a config file, or does not exist when must_exist=True.
     """
+    if isinstance(value, Path):
+        value = str(value)
     if not isinstance(value, str) or not value.strip():
         raise ValueError("Path must be a non-empty string.")
 
@@ -309,11 +315,12 @@ def validate_path(value: str, must_exist: bool = False) -> str:
     path_str = value.strip()
     path = Path(path_str)
 
-    # Basic forbidden characters (expand if needed)
-    forbidden = [' ', '(', ')', '[', ']', '{', '}', ';', '"', "'"]
-    if any(ch in path_str for ch in forbidden):
+    # UDLF removes every space/tab of a config line and treats '#' as the
+    # start of a comment, so such paths would be read as a different path.
+    if any(ch.isspace() for ch in path_str) or "#" in path_str:
         raise ValueError(
-            f"Invalid path '{path_str}'. It contains spaces or forbidden characters."
+            f"Invalid path '{path_str}'. UDLF cannot read paths containing spaces "
+            "or '#' from its config file. Rename the file/folder or use a link."
         )
 
     # Optional existence check

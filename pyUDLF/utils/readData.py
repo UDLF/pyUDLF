@@ -1,4 +1,7 @@
+import logging
 import re
+
+logger = logging.getLogger(__name__)
 
 
 def read_config(path):
@@ -122,7 +125,7 @@ def read_ranked_lists_file_numeric(file_path, top_k=-1):
     Returns:
         list: A ranked list with image numbers.
     """
-    print("\n\tReading file...", file_path)
+    logger.debug("Reading file %s", file_path)
     
     with open(file_path, "r") as f:
         ranked_list = [line.strip().split(" ") for line in f]
@@ -133,9 +136,9 @@ def read_ranked_lists_file_numeric(file_path, top_k=-1):
             ranked_list[i] = ranked_list[i][:top_k]
 
     if top_k != -1:
-        print("\n\t** Returned ranked list size (limited to top_k):", len(ranked_list[0]))
+        logger.debug("Ranked lists limited to top_k = %d", len(ranked_list[0]))
     else:
-        print("\n\t** Returned all the ranked list with size:", len(ranked_list[0]))
+        logger.debug("Whole ranked lists returned (size %d)", len(ranked_list[0]))
     
     return ranked_list
 
@@ -151,7 +154,7 @@ def read_ranked_lists_file_string(file_path, top_k=-1):
     Returns:
         list: A ranked list with image numbers.
     """
-    print("\n\tReading file...", file_path)
+    logger.debug("Reading file %s", file_path)
     
     with open(file_path, "r") as f:
         ranked_list = [line.strip().split(" ") for line in f]
@@ -162,9 +165,9 @@ def read_ranked_lists_file_string(file_path, top_k=-1):
             ranked_list[i] = ranked_list[i][:top_k]
 
     if top_k != -1:
-        print("\n\t** Returned ranked list size (limited to top_k):", len(ranked_list[0]))
+        logger.debug("Ranked lists limited to top_k = %d", len(ranked_list[0]))
     else:
-        print("\n\t** Returned all the ranked list with size:", len(ranked_list[0]))
+        logger.debug("Whole ranked lists returned (size %d)", len(ranked_list[0]))
     
     return ranked_list
 
@@ -179,7 +182,7 @@ def read_matrix_file(file_path):
     Returns:
         returns a matrix
     """
-    print("\n\tReading file", file_path)
+    logger.debug("Reading file %s", file_path)
     with open(file_path, "r") as f:
         return [[float(y) for y in x.strip().split(" ")]
                 for x in f.readlines()]

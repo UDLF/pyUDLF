@@ -4,6 +4,10 @@ import os.path
 import re
 import tempfile
 
+from pyUDLF.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 def initParameters(config_path, parameters, list_parameters):
     """
@@ -20,9 +24,8 @@ def initParameters(config_path, parameters, list_parameters):
     """
     try:
         parameters, list_parameters = readData.read_config(config_path)
-    except:
-        print("ERROR, could not initialize inputType")
-        print("Invalid config!")
+    except Exception as e:
+        logger.error("Could not read the config %s: %s", config_path, e)
         return dict(), []
 
     return parameters, list_parameters
@@ -81,9 +84,8 @@ def setParameter(param, value, parameters):
 
         if(len(aux)) > 1:
             parameters[param][1] = aux[1]
-        # print("{} insert with sucess".format(param))
     else:
-        print("{} does not exist in parameters!".format(param))
+        logger.warning("%s does not exist in parameters!", param)
 
 
 def getParameter(param, parameters):
@@ -101,7 +103,7 @@ def getParameter(param, parameters):
     if param in parameters:
         return parameters[param]
     else:
-        print("{} does not exist in parameters!".format(param))
+        logger.warning("%s does not exist in parameters!", param)
 
 
 def new_parameters(param, value, parameters, list_parameters):
@@ -123,7 +125,7 @@ def new_parameters(param, value, parameters, list_parameters):
         parameters[param] = [str(value)]
         list_parameters.append(param)
     else:
-        print("Parameters already exist")
+        logger.warning("Parameter %s already exists", param)
 
 
 def writeConfig(parameters, list_parameters, path="new_config.ini"):

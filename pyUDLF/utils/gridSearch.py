@@ -1,4 +1,7 @@
 from pyUDLF import run_calls
+from pyUDLF.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def _sort_results(results):
@@ -35,32 +38,27 @@ def find_best_param(input_type, method, param_value, list_values, ranked_list_si
                 if type_list_values == "int":
                     for param in list_values:
                         if type(param) is not int:
-                            print("The parameter {} accepts only integer values".format(
-                                param_value))
-                            print(
-                                "The value {} is not an integer. Execution interrupted!".format(param))
+                            logger.error("The parameter %s accepts only integer values; "
+                                         "%r is not an integer.", param_value, param)
                             return None
                 else:
                     for param in list_values:
                         if type(param) is not float:
-                            print("The parameter {} accepts only float values".format(
-                                param_value))
-                            print(
-                                "The value {} is not a float. Execution interrupted!".format(param))
+                            logger.error("The parameter %s accepts only float values; "
+                                         "%r is not a float.", param_value, param)
                             return None
             else:
                 for value in list_values:
                     if value not in aux:
-                        print("The value {} does not belong to the list of possible values for the parameter {}".format(
-                            value, param_value))
-                        print("Execution interrupted!")
+                        logger.error("The value %r is not one of the possible values of %s.",
+                                     value, param_value)
                         return None
 
         else:
-            print("Parameter does not belong to the method. Execution interrupted!")
+            logger.error("Parameter %s does not belong to the method %s.", param_value, method)
             return None
     else:
-        print("Parameter does not exist. Unable to execute!")
+        logger.error("Parameter %s does not exist.", param_value)
         return None
 
     # salvando valores antigos
@@ -284,8 +282,8 @@ def find_best_method(input_type, ranked_list_size=0, verbose=True):
             # caso contrario, funciona normalmente
             output = run_calls.run(input_type, get_output=True)
             if(output is False):
-                print(
-                    "Error when executing the {} method, your results will not be considered!".format(method))
+                logger.warning("Error when executing the %s method, its results will not "
+                               "be considered.", method)
                 if(r_values):
                     for param in recall_param:
                         best_dict[param].append(("NONE", method))
@@ -364,9 +362,8 @@ def find_best_method_with_best_k(input_type, measures=[], k_interval=[], ranked_
     # verifying if k is int
     for param in k_interval:
         if type(param) is not int:
-            print("ERROR!")
-            print("The parameter k accepts only integer values!")
-            print("The value {} is not an integer!".format(param))
+            logger.error("The parameter k accepts only integer values; %r is not an "
+                         "integer.", param)
             return None
 
     available_methods = input_type.get_param("UDL_METHOD")[1].strip()
@@ -430,10 +427,7 @@ def find_best_method_with_best_k(input_type, measures=[], k_interval=[], ranked_
                 # best_dict[measure].append((best[0], best[1], k))
                 best_dict[measure].append((best[0], best[1], k))
         else:
-            print()
-            print(" WARNING ! ")
-            print("Measure {} does not exist, it will not be counted!".format(measure))
-            print()
+            logger.warning("Measure %s does not exist, it will not be counted.", measure)
 
     # fazer
     # atribuir valor antigo de volta nos metodos

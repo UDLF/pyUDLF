@@ -214,7 +214,6 @@ class OutputType:
         Raises:
             ValueError: if line is not a valid index.
         """
-        print(self.rk_path, self.list_path, self.classes_path, self.images_path)
         if type(line) is not int or line < 0:
             raise ValueError(f"line must be a non-negative integer, got {line!r}")#print(self.rk_path, self.list_path, self.classes_path, self.images_path)
         return render_ranked_list(

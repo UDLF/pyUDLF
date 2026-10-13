@@ -197,19 +197,31 @@ def read_classes(lists_path="", classes_path="", input_type=None):
         classes_path = str(input_type.get_classes_file()[0].strip())
         lists_path = str(input_type.get_lists_file()[0].strip())
 
-    # like UDLF, both files are read as whitespace separated tokens
+    # like UDLF, the lists file is read as whitespace separated tokens
     with open(lists_path) as f:
         lists = f.read().split()
 
+    return classes_of(lists, classes_path)
+
+
+def classes_of(names, classes_path):
+    '''
+    Class of each name, read from a UDLF classes file ("name:class" tokens).
+
+    Class labels are returned as int when numeric, otherwise as str.
+
+    Raises:
+        KeyError: if some name has no class in the file.
+    '''
     classes_dict = dict()
     with open(classes_path) as f:
         for token in f.read().split():
             name, _, label = token.partition(':')
             classes_dict[name] = int(label) if label.lstrip('-').isdigit() else label
 
-    missing = [element for element in lists if element not in classes_dict]
+    missing = [element for element in names if element not in classes_dict]
     if missing:
-        raise KeyError(f"{len(missing)} elements of {lists_path} have no class in "
-                       f"{classes_path} (first: {missing[0]!r})")
+        raise KeyError(f"{len(missing)} elements have no class in {classes_path} "
+                       f"(first: {missing[0]!r})")
 
-    return [classes_dict[element] for element in lists]
+    return [classes_dict[element] for element in names]

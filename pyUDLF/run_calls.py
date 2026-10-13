@@ -221,35 +221,49 @@ def run_platform(config_file: str, bin_path: str):
             bool: True if the run FAILED, False if it completed correctly.
             str: Everything UDLF printed (stdout and stderr).
     """
-    global operating_system
-
     # Ensure binary and config exist (download/extract if missing)
     verify_bin(config_file, bin_path)
 
-    # Build command
+    logger.info(f"Running UDLF framework with config: {config_file}")
+    output, problems = execute_udlf(config_file, bin_path)
+    if problems:
+        for problem in problems:
+            logger.error(problem)
+        if output:
+            logger.error("Last lines printed by UDLF:\n%s", _tail(output))
+        return True, output
+
+    logger.info("UDLF run successfully.")
+    return False, output
+
+
+def execute_udlf(config_file: str, bin_path: str, cwd: str = None):
+    """
+    Run the UDLF binary on a config file and diagnose the run.
+
+    Args:
+        config_file (str): Path to the configuration file.
+        bin_path (str): Path to the UDLF binary.
+        cwd (str, optional): Working directory of the process (relative
+            paths in the config are relative to it). Default: current one.
+
+    Returns:
+        tuple:
+            str: Everything UDLF printed (stdout and stderr).
+            list[str]: Problems found (see verify_running); empty if the run is OK.
+    """
     cmd = [bin_path, config_file]
     if operating_system == "windows":
         cmd = ["cmd", "/c"] + cmd
-
-    logger.info(f"Running UDLF framework with config: {config_file}")
     logger.debug(f"Command: {' '.join(cmd)}")
 
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                              text=True, errors="replace", check=False)
+                              text=True, errors="replace", check=False, cwd=cwd)
     except OSError as e:
-        logger.error(f"Failed to run UDLF binary {bin_path}: {e}")
-        return True, ""
+        return "", [f"Failed to run UDLF binary {bin_path}: {e}"]
 
-    problems = verify_running(proc.returncode, proc.stdout)
-    if problems:
-        for problem in problems:
-            logger.error(problem)
-        logger.error("Last lines printed by UDLF:\n%s", _tail(proc.stdout))
-        return True, proc.stdout
-
-    logger.info("UDLF run successfully.")
-    return False, proc.stdout
+    return proc.stdout, verify_running(proc.returncode, proc.stdout)
 
 
 # Messages UDLF prints when it replaces a value set by the user with its
@@ -448,7 +462,11 @@ def _required_columns(values: dict):
         if method in ("CONTEXTRR", "RLSIM"):  # these read the full ranked lists
             return n
         if method == "RDPAC":
-            return int(float(values["PARAM_RDPAC_L"]) * float(values["PARAM_RDPAC_L_MULT"]))
+            l = int(values["PARAM_RDPAC_L"])
+            l_mult = float(values["PARAM_RDPAC_L_MULT"])
+            if l_mult * l > n:  # RDPAC.cpp reduces L itself in this case
+                l = int(n / l_mult)
+            return int(l_mult * l)
         return int(values[f"PARAM_{method}_L"])
     except (KeyError, ValueError):
         return None

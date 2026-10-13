@@ -2,26 +2,12 @@ import os
 from pyUDLF.utils import configGenerator
 from pyUDLF import run_calls
 from pyUDLF.utils.logger import get_logger
-from pyUDLF.utils.validations import validate_param, validate_path, METHOD_PARAMS
+from pyUDLF.utils.validations import validate_param, validate_path, METHOD_PARAMS, matches_type
 from pyUDLF.utils.visualization import render_ranked_list
 from pathlib import Path
 from numbers import Integral
 import numpy as np
 logger = get_logger(__name__)
-
-
-def _matches_type(value, expected_type) -> bool:
-    """Type check for method parameters: an int is a valid float, and a bool
-    is never a number (in Python, bool is a subclass of int)."""
-    if expected_type is bool:
-        return isinstance(value, (bool, np.bool_))
-    if isinstance(value, (bool, np.bool_)):
-        return False
-    if expected_type is int:
-        return isinstance(value, (Integral, np.integer))
-    if expected_type is float:
-        return isinstance(value, (Integral, float, np.integer, np.floating))
-    return isinstance(value, expected_type)
 
 
 def _as_ranked_lists_matrices(value):
@@ -734,7 +720,7 @@ class InputType:
                 continue
 
             expected_type = spec.get("type")
-            if expected_type is not None and not _matches_type(value, expected_type):
+            if expected_type is not None and not matches_type(value, expected_type):
                 raise ValueError(
                     f"Invalid type for parameter '{key}' in method {method}. "
                     f"Expected {expected_type.__name__}, got {type(value).__name__}."

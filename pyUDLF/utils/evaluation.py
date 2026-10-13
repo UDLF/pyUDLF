@@ -3,8 +3,10 @@ Effectiveness measures for ranked lists, computed as UDLF does
 (src/Evaluation/Effectiveness.cpp), so the values match the UDLF log.
 
 In every function:
-    rks          -> ranked lists, one per query (rks[i] is the list of query i)
+    rks          -> ranked lists, one per query (rks[i] is the list of query i);
+                    a list of lists or a 2D numpy array of indices
     classes_list -> class label of each element, in the dataset order
+                    (any hashable labels: ints, strings, ...)
     depth        -> number of positions considered; -1 means the whole lists.
                     A depth larger than the lists is reduced to their size.
 """
@@ -27,6 +29,16 @@ def _resolve_depth(rks, depth, name="depth"):
     return depth
 
 
+def _hits(rks, classes_list, depth):
+    """Boolean matrix (queries x depth): is position j of query i relevant?
+    Also returns the class id of each element and the size of each class."""
+    mapping = {}
+    ids = np.array([mapping.setdefault(label, len(mapping)) for label in classes_list])
+    sizes = np.bincount(ids)
+    top = np.array([rk[:depth] for rk in rks], dtype=np.int64)
+    return ids[top] == ids[:len(top), None], ids[:len(top)], sizes
+
+
 def get_class_size_dict(class_list):
     class_size_dict = dict()
     for label in class_list:
@@ -45,20 +57,12 @@ def compute_map(rks, classes_list, map_depth=-1):
         (MAP rounded to 4 decimals, list with the average precision of each query)
     """
     depth = _resolve_depth(rks, map_depth, "map_depth")
-    class_size_dict = get_class_size_dict(classes_list)
+    hits, ids, sizes = _hits(rks, classes_list, depth)
 
-    map_list = []
-    for i, rk in enumerate(rks):
-        cl_i = classes_list[i]
-        hits = 0
-        acum = 0.0
-        for j in range(depth):
-            if classes_list[rk[j]] == cl_i:
-                hits += 1
-                acum += hits / (j + 1)
-        map_list.append(acum / min(depth, class_size_dict[cl_i]))
+    precision_at = np.cumsum(hits, axis=1) / np.arange(1, depth + 1)
+    ap = (precision_at * hits).sum(axis=1) / np.minimum(depth, sizes[ids])
 
-    return round(float(np.mean(map_list)), 4), map_list
+    return round(float(ap.mean()), 4), ap.tolist()
 
 
 def compute_recall(rks, classes_list, r_depth=-1):
@@ -72,20 +76,15 @@ def compute_recall(rks, classes_list, r_depth=-1):
         (recall rounded to 4 decimals, list with the recall of each query)
     """
     depth = _resolve_depth(rks, r_depth, "r_depth")
-    class_size_dict = get_class_size_dict(classes_list)
+    hits, ids, sizes = _hits(rks, classes_list, depth)
 
-    recall_list = []
-    for i, rk in enumerate(rks):
-        cl_i = classes_list[i]
-        hits = sum(1 for j in range(depth) if classes_list[rk[j]] == cl_i)
-        recall_list.append(hits / class_size_dict[cl_i])
+    recall = hits.sum(axis=1) / sizes[ids]
+    queries_per_class = np.bincount(ids, minlength=len(sizes))
+    present = queries_per_class > 0
+    by_class = np.bincount(ids, weights=recall, minlength=len(sizes))[present] \
+        / queries_per_class[present]
 
-    by_class = {}
-    for i, value in enumerate(recall_list):
-        by_class.setdefault(classes_list[i], []).append(value)
-    r_value = np.mean([np.mean(values) for values in by_class.values()])
-
-    return round(float(r_value), 4), recall_list
+    return round(float(by_class.mean()), 4), recall.tolist()
 
 
 def compute_precision(rks, classes_list, p_depth=-1):
@@ -96,14 +95,11 @@ def compute_precision(rks, classes_list, p_depth=-1):
         (precision rounded to 4 decimals, list with the precision of each query)
     """
     depth = _resolve_depth(rks, p_depth, "p_depth")
+    hits, _, _ = _hits(rks, classes_list, depth)
 
-    precision_list = []
-    for i, rk in enumerate(rks):
-        cl_i = classes_list[i]
-        hits = sum(1 for j in range(depth) if classes_list[rk[j]] == cl_i)
-        precision_list.append(hits / depth)
+    precision = hits.sum(axis=1) / depth
 
-    return round(float(np.mean(precision_list)), 4), precision_list
+    return round(float(precision.mean()), 4), precision.tolist()
 
 
 def compute_gain(before_rks, after_rks, classes_list, depth=-1, measure="MAP", verbose=True):

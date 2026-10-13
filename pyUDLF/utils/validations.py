@@ -4,6 +4,7 @@ Generated from config.ini specification.
 """
 
 from pyUDLF.utils.logger import get_logger
+from numbers import Integral
 from pathlib import Path
 
 import numpy as np
@@ -221,6 +222,20 @@ METHOD_PARAMS = {
     },
 }
 
+
+
+def matches_type(value, expected_type) -> bool:
+    """Type check for method parameters: an int is a valid float, and a bool
+    is never a number (in Python, bool is a subclass of int)."""
+    if expected_type is bool:
+        return isinstance(value, (bool, np.bool_))
+    if isinstance(value, (bool, np.bool_)):
+        return False
+    if expected_type is int:
+        return isinstance(value, (Integral, np.integer))
+    if expected_type is float:
+        return isinstance(value, (Integral, float, np.integer, np.floating))
+    return isinstance(value, expected_type)
 
 
 def validate_param(key: str, value):

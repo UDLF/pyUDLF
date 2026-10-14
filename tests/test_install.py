@@ -10,6 +10,8 @@ import hashlib
 import io
 import os
 import stat
+import subprocess
+import sys
 import tarfile
 from pathlib import Path
 
@@ -187,6 +189,22 @@ def test_legacy_verify_bin_does_not_download_for_custom_path(fake_release, tmp_p
     monkeypatch.setattr(install, "_fetch", lambda *a: pytest.fail("must not download"))
     run_calls.verify_bin(run_calls.config_path, str(tmp_path / "custom" / "udlf"))
     assert "not found" in caplog.text
+
+
+def test_legacy_binary_from_environment(tmp_path):
+    """UDLF_BIN sets the binary of the legacy API too (read when run_calls is imported)."""
+    code = "from pyUDLF import run_calls; print(run_calls.bin_path)"
+    custom = str(tmp_path / "udlf")
+    paths = {}
+    for name, value in [("set", custom), ("unset", None)]:
+        env = {k: v for k, v in os.environ.items() if k != "UDLF_BIN"}
+        if value:
+            env["UDLF_BIN"] = value
+        proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                              env=env, check=True)
+        paths[name] = proc.stdout.strip()
+    assert paths["set"] == custom
+    assert paths["unset"] == str(install.default_binary_path())
 
 
 # --------------------------------------------------------------------------

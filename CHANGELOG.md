@@ -51,6 +51,7 @@ configuration (12 methods, all input/output formats, fusion), on a synthetic dat
   that does not exist (use `add_new_parameter()`).
 - `setBinaryPath()` / `setConfigPath()` raise `FileNotFoundError` for a missing file instead of
   silently using the default path.
+- The `UDLF_BIN` environment variable sets the binary of the legacy API too (as in `pyUDLF.UDLF`).
 - `evaluation.compute_map()` divides the average precision by `min(depth, class size)` and
   `compute_recall()` averages per class, as UDLF; values differ from 0.8 when the depth is
   smaller than a class, or (recall) when classes have different sizes.

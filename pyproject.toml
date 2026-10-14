@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyUDLF"
+dynamic = ["version"]
+description = "Python wrapper for UDLF, the Unsupervised Distance Learning Framework"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "GPL-2.0-only"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Gustavo Rosseto Leticio", email = "gustavo.leticio@unesp.br" },
+    { name = "Lucas Pascotti Valem", email = "lucas.valem@unesp.br" },
+    { name = "Daniel Carlos Guimarães Pedronette", email = "daniel.pedronette@unesp.br" },
+]
+keywords = ["udlf", "re-ranking", "unsupervised distance learning",
+            "content-based image retrieval", "ranked lists"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+]
+dependencies = [
+    "numpy",
+]
+
+[project.optional-dependencies]
+viz = ["Pillow"]
+test = ["pytest"]
+
+[project.scripts]
+pyudlf = "pyUDLF.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/UDLF/pyUDLF"
+Source = "https://github.com/UDLF/pyUDLF"
+Issues = "https://github.com/UDLF/pyUDLF/issues"
+UDLF = "https://github.com/UDLF/UDLF"
+
+[tool.setuptools.dynamic]
+version = { attr = "pyUDLF.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["pyUDLF*"]
+
+[tool.setuptools.package-data]
+pyUDLF = ["data/config.ini"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

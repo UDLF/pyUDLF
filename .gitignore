@@ -11,3 +11,9 @@ dist/
 __pycache__/
 *.pyc
 *.pyo
+
+# UDLF binary built by scripts/build_udlf.sh
+.udlf/
+
+# Test caches
+.pytest_cache/

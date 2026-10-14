@@ -1,4 +1,10 @@
+# pyUDLF
 
+[![tests](https://github.com/UDLF/pyUDLF/actions/workflows/tests.yml/badge.svg)](https://github.com/UDLF/pyUDLF/actions/workflows/tests.yml)
+
+**Python wrapper for [UDLF](https://github.com/UDLF/UDLF), the Unsupervised Distance Learning Framework.**
+
+[Versão em português](READMEpt.md)
 
 **Authors:** Gustavo Rosseto Leticio, [Lucas Pascotti Valem](http://www.lucasvalem.com) and [Daniel Carlos Guimarães Pedronette](http://www.ic.unicamp.br/~dcarlos/)
 
@@ -6,125 +12,266 @@ Dept. of Statistic, Applied Math. and Computing, Universidade Estadual Paulista 
 
 ----------------------
 * [Overview](#overview)
-* [How to install](#how-to-install)
-* [First Steps](#first-steps)
-* [Execution example](#execution-example)
-* [Examples](#examples)
-* [Documentation](#documentation)
-* [Contribution](#contribution)
+* [Installation](#installation)
+* [Quickstart](#quickstart)
+* [Usage](#usage)
+* [Running your own config file](#running-your-own-config-file)
+* [Legacy API](#legacy-api)
+* [Command line](#command-line)
+* [File formats](#file-formats)
+* [Development](#development)
 * [Applications](#applications)
+* [Cite](#cite)
 * [Contact](#contact)
 * [Acknowledgments](#acknowledgments)
 * [License](#license)
 
 
 ## Overview
-The <strong>pyUDLF</strong> acts as a Python wrapper for the UDLF that is in C/C++.
-This way, all the calls are made as if the UDLF is in Python, but pyUDLF actually calls from the binary of the original version. If the user does not have the binary, pyUDLF will download it and the configuration file.
+
+UDLF is a C++ framework of unsupervised distance learning methods for image and multimedia
+retrieval: given the ranked lists (or a distance / similarity matrix) of a dataset, a method
+re-ranks them using the contextual information they contain, with no labels.
+pyUDLF runs these methods from Python: you pass numpy arrays (or files) and get back
+the re-ranked lists and the evaluation measures (MAP, Precision@k, Recall@k) as numpy arrays
+and numbers. The configuration files, input files and the UDLF binary are handled for you.
+
+Methods (UDLF 1.70), with the names and papers listed by UDLF:
+
+| Name in pyUDLF | Method (paper) |
+|---|---|
+| `CPRR` | [CPRR](http://dx.doi.org/10.1109/SIBGRAPI.2016.042) |
+| `LHRR` | [LHRR](http://doi.org/10.1109/TIP.2019.2920526) |
+| `RDPAC` | [RDPAC](https://doi.org/10.3390/jimaging7030049) |
+| `RFE` | [RFE](https://doi.org/10.1109/TIP.2023.3268868) |
+| `BFSTREE` | [BFSTree](https://doi.org/10.1016/j.patcog.2020.107666) |
+| `CONTEXTRR` | [ContextRR](http://dl.acm.org/citation.cfm?id=1948207.1948291) |
+| `CORGRAPH` | [Correlation Graph](http://dx.doi.org/10.1016/j.neucom.2016.03.081) |
+| `RKGRAPH` | [Rk Graph Dist.](http://dx.doi.org/10.1016/j.patrec.2016.05.021) |
+| `RECKNNGRAPH` | [ReckNNGraph](http://dx.doi.org/10.1016/j.imavis.2013.12.009) |
+| `RLRECOM` | [RL-Recom](http://dx.doi.org/10.1145/2671188.2749336) |
+| `RLSIM` | [RL-Sim*](http://dx.doi.org/10.1145/2671188.2749335) |
+| `NONE` | no re-ranking (evaluates the input) |
 
 
-## How to install
-python setup.py install
+## Installation
+
+Requires Python 3.9+.
+
+```bash
+pip install git+https://github.com/UDLF/pyUDLF.git          # core
+pip install "pyUDLF[viz] @ git+https://github.com/UDLF/pyUDLF.git"  # + ranked list images (Pillow)
+```
+
+Then install the UDLF binary (official release, checked with its SHA-256):
+
+```bash
+pyudlf download
+```
+
+It goes to `~/.pyudlf/bin` (or `$PYUDLF_HOME/bin`); `pyudlf where` shows the binary in use.
+There are official builds for Linux and Windows. On other systems (e.g. macOS), build UDLF from
+source (`make` in the [UDLF repository](https://github.com/UDLF/UDLF), or `scripts/build_udlf.sh`
+here) and use it with `UDLF(bin_path=...)` or the `UDLF_BIN` environment variable.
 
 
-## First Steps
-1) Paths
-
-The user is able to define the path to the UDLF binary and config, if not defined, pyUDLF defaults to the user path. **Note that if the files do not exist in the defined paths, they will be downloaded.**
-
-2) Configuration
-
-After configuring the paths, the user is able to configure the UDLF configuration file, such as assigning or receiving values, listing all parameters and values, among other features, all through pyUDLF, without the need to manually change the config. An example of an advantage gained with this functionality would be a run with the result obtained from another run, or successive runs...
-**It is important to note that the input object comes with the parameters and values that are defined in the config for the given path!**
-
-3) Execution
-
-You can run pyUDLF in three ways:
-
-+ **Available config file**: runs the UDLF with some provided config.
-+ **Unavailable config file**: through an "input" object, you can configure at will and execute, without the need to have the config file saved on the machine.
-+ **Returns**: The previous two ways but with returns, i.e. the result log in a dictionary and the ranked list or return matrix.
-
-4) Returns
-
-On completion, pyUDLF and performs an execution as specified.
-In cases where the result of the operation is requested, a dictionary is returned, with the outputs specified in the config.
-
-
-These 4 steps are exemplified in the following topic, where a simple execution example is provided. Remember that there is more than one way to define, configure and execute.
-
-
-## Execution example
-
-This example is simple, just to show one way of execution. More complex examples or different ways of execution are in [Examples](#Examples).
-Note that the example had the paths set, some parameters changed and the return was requested.
+## Quickstart
 
 ```python
-from pyUDLF import run_calls as udlf
-from pyUDLF import inputType
+import numpy as np
+from pyUDLF import UDLF
 
-# Setting the binary and config path (1)
-udlf.setBinaryPath("/home/usr/Desktop/UDLF/UDLF/bin/udlf")
-udlf.setConfigPath = ("/home/usr/Desktop/UDLF/UDLF/bin/minha_config.ini")
+# A small dataset: 200 elements in 10 classes, with noisy 32-D features
+rng = np.random.default_rng(7)
+labels = np.repeat(np.arange(10), 20)
+features = rng.normal(size=(10, 32))[labels] + rng.normal(scale=1.4, size=(200, 32))
 
-# Defining the input object, named input_data (2)
-input_data = inputType.InputType()
+# Ranked lists: each row is a query, with all elements sorted by distance
+distances = np.linalg.norm(features[:, None] - features[None], axis=2)
+ranked_lists = np.argsort(distances, axis=1, kind="stable")
 
-# Changing config values. (2)
-#most used parameters
-#set_*param_name*(param_value)
-files_path = "../Soccer/matrices/distance/acc.txt"
-classes_path = "/home/gustavo/Desktop/UDLF/UDLF/Soccer/classes.txt"
-input_data.set_method_name("CPRR")   #(NONE|CPRR|RLRECOM|...)Selection of method to be executed
-input_data.set_input_files(files_path)   #Path of the main input file (matrix/ranked lists) for UDL tasks
-input_data.set_lists_file(".../Soccer/lists.txt")    #Path of the lists file
-input_data.set_classes_file(classes_path)   #Path of the classes file
-...
+# Re-rank them with CPRR (needs the UDLF binary: run `pyudlf download` once)
+udlf = UDLF()
+res = udlf.run("CPRR", ranked_lists=ranked_lists, params={"l": 100, "k": 10},
+               classes=labels)
 
-#generic parameter
-#set_param("param_name", param_value) 
-input_data.set_param("UDL_TASK", "UDL")     #(UDL|FUSION): Selection of task to be executed
-input_data.set_param("PARAM_NONE_L", 1400)  #(TUint): Size of the ranked list (must be lesser than SIZE_DATASET)
-...
+print(res)                       # Result(method='CPRR', ranked_lists=(200, 100), MAP 0.5471 -> 0.7602)
+print(res.metrics["before"]["P@10"], "->", res.metrics["after"]["P@10"])   # 0.631 -> 0.8315
+before, after = res.per_query()  # average precision of each query
+print((after > before).sum(), "of 200 queries improved")                  # 186 of 200 queries improved
+```
 
-# Running (3)
-output = udlf.run(input_data, get_output = True)
+This script is also in [examples/quickstart.py](examples/quickstart.py).
 
-# Result
-output.print_log()
-results = output.get_log()
-print(results["MAP"]["After"]) # or ["Before"] or ["Gain"]
-print(results["MAP"])
-print(results["Time"])
 
+## Usage
+
+The examples below continue the quickstart.
+
+### Inputs
+
+```python
+# Ranked lists: one row per query with element indices (numpy array, list of lists or file)
+res = udlf.run("LHRR", ranked_lists=ranked_lists, params={"l": 100}, classes=labels)
+res = udlf.run("LHRR", ranked_lists="ranked_lists.txt", params={"l": 100}, classes=labels)
+
+# Distance or similarity matrix (N x N)
+res = udlf.run("RDPAC", matrix=distances, matrix_type="dist", params={"l": 50}, classes=labels)
+
+# Files in the UDLF formats: ranked lists, element names ("lists") and "name:class" classes
+res = udlf.run("CPRR", ranked_lists="ranked_lists.txt", names="lists.txt",
+               classes="classes.txt", params={"l": 100})
+```
+
+Input files are used in place; arrays are written to a temporary directory, removed after the run.
+Without `classes`, the evaluation is skipped (and a warning is logged).
+
+### Parameters
+
+`params` takes the parameters of the method by name; the others keep the default values of the
+UDLF reference configuration. List them with `UDLF.describe`:
+
+```python
+print(UDLF.describe("CPRR"))
+# CPRR parameters (params={name: value}):
+#   l = 400 (int): Size of ranked lists (must be lesser than SIZE_DATASET)
+#   k = 20 (int): Number of nearest neighbors
+#   t = 2 (int): Number of iterations
+```
+
+`UDLF.methods()` lists the methods. Note that the default `l` of several methods (e.g. 400 or
+1400) assumes larger datasets: it must not be larger than the number of elements, and the input
+ranked lists must have at least `l` elements.
+
+### Results
+
+```python
+res.ranked_lists          # re-ranked lists: numpy array (queries x output size)
+res.metrics               # {"before": {...}, "after": {...}, "gain": {...}}: MAP, P@k, Recall@k
+res.map_before, res.map_after
+res.time                  # execution time of the method, in seconds (measured by UDLF)
+res.per_query("MAP")      # value of each query, before and after (also "precision", "recall")
+res.config, res.stdout    # configuration used and UDLF output, for reproducibility
+```
+
+The measures are computed by UDLF up to the size of the output ranked lists (MAP@L); `gain` is
+the relative gain in percent. Other options:
+
+```python
+# Output as a distance (or similarity) matrix instead of ranked lists
+res = udlf.run("CPRR", ranked_lists=ranked_lists, params={"l": 100}, output="matrix")
+res.matrix.shape          # (200, 200)
+
+# Choose the P@k / Recall@k values and keep the files of the run
+res = udlf.run("CPRR", ranked_lists=ranked_lists, params={"l": 100}, classes=labels,
+               precisions=[5, 10], recalls=[10], keep_files=True)
+res.files                 # paths of the config, log, inputs and output of the run
+```
+
+### Fusion
+
+```python
+# Fuse ranked lists of the same dataset obtained with different features / distances
+unit = features / np.linalg.norm(features, axis=1, keepdims=True)
+ranked_lists_cosine = np.argsort(-(unit @ unit.T), axis=1, kind="stable")
+res = udlf.fuse("CPRR", [ranked_lists, ranked_lists_cosine], params={"l": 100}, classes=labels)
+res.map_after             # FUSION results only have metrics after fusion
+```
+
+### Errors
+
+Problems are reported as exceptions, before running UDLF whenever possible:
+
+```python
+from pyUDLF import UDLFParamError
+
+try:
+    udlf.run("CPRR", ranked_lists=ranked_lists, params={"l": 500})
+except UDLFParamError as e:
+    print(e)   # PARAM_CPRR_L = 500 is larger than the dataset (N = 200). Pass a smaller value in params.
+```
+
+`UDLFParamError` (invalid method, parameter or input), `UDLFRunError` (UDLF failed: has
+`.problems`, `.output` and `.config`) and `UDLFNotFoundError` (no binary) all derive from
+`UDLFError`. Warnings and errors are logged with the standard `logging` module; call
+`pyUDLF.enable_logging("INFO")` to also see informative messages.
+
+
+## Running your own config file
+
+A UDLF configuration file runs as it is. Relative paths are relative to the current directory:
+
+```python
+res = udlf.run_config("config.ini")
+res.ranked_lists, res.metrics, res.files
 ```
 
 
-## Examples
-More detailed examples, with further definition/configuration and execution forms, can be found on the [examples page](https://github.com/UDLF/pyUDLF/wiki/Examples). On this page you will be shown a basic step by step how to do it, not being the only way to do it, just one of them, and finally more examples, as follows: 
+## Legacy API
 
-* [How To](https://github.com/UDLF/pyUDLF/wiki/Examples##how-to)
-* [More examples](https://github.com/UDLF/pyUDLF/wiki/Examples##more-examples)
+The API of previous versions (`InputType` and `run_calls`) is still available and gives the same
+results. The [wiki](https://github.com/UDLF/pyUDLF/wiki/Documentation) documents it.
 
-PyUDLF enables new ways to manage UDLF. But the right sequence of operations would be:
-1) [Setting the file paths](https://github.com/UDLF/pyUDLF/wiki/Examples##1-setting-the-file-paths).
-2) [Setting the values for the parameters](https://github.com/UDLF/pyUDLF/wiki/Examples##2-setting-the-values-for-the-parameters).
-3) [Execution](https://github.com/UDLF/pyUDLF/wiki/Examples##3-execution).
-4) [Results, if requested at execution](https://github.com/UDLF/pyUDLF/wiki/Examples##4-results).
+```python
+from pyUDLF import run_calls
+from pyUDLF.utils.inputType import InputType
+
+inp = InputType()                      # starts from the UDLF reference configuration
+inp.set_method_name("CPRR")
+inp.set_input_file("ranked_lists.txt")
+inp.set_lists_file("lists.txt")
+inp.set_classes_file("classes.txt")
+inp.set_dataset_size(200)
+inp.set_method_parameters("CPRR", l=100, k=10)
+inp.set_output_file_format("RK")
+inp.set_output_rk_format("NUM")
+inp.set_output_file_path("output")     # writes output.txt
+inp.set_output_log_file_path("log.txt")
+
+output = run_calls.run(inp, get_output=True)
+print(output.log_dict["MAP"])   # {'Before': 0.5471, 'After': 0.7602, 'Gain': 38.9512}
+```
+
+See the [CHANGELOG](CHANGELOG.md) for the behavior changes of this version.
 
 
-## Documentation
+## Command line
 
-Highest level operation of PyUDLF:
+```bash
+pyudlf download              # install the official UDLF binary (--version, --dest, --force)
+pyudlf where                 # binary used by pyUDLF
+pyudlf methods               # available methods
+pyudlf describe CPRR         # parameters of a method
+```
 
-![basic2](https://user-images.githubusercontent.com/69856485/161096018-417ba18b-b8a2-40df-b5c5-bf16c076edb8.png)
 
-Documentation for the functions is available at [documentation page](https://github.com/UDLF/pyUDLF/wiki/Documentation)
+## File formats
+
+These are the formats UDLF reads (see the [UDLF wiki](https://github.com/UDLF/UDLF/wiki/File-Formats)):
+
+- **Ranked lists**: one line per query, elements separated by spaces, either as indices
+  (`0 12 25 ...`) or as names (`img_0001.jpg img_0013.jpg ...`, then pass `names=`).
+  Each line must have at least `l` elements; the query is usually the first one.
+- **Matrix**: N lines with N values (distances or similarities) separated by spaces.
+- **Lists** (`names=`): one element name per line, in the order of the dataset.
+- **Classes** (`classes=`): one `name:class` per line.
+
+UDLF cannot read paths with spaces or `#` in its configuration files, so pyUDLF rejects them.
 
 
-## Contribution
-We welcome suggestions, ideas, and contributions.
-If you would like to contribute, feel free to [contact](#Contact) us.
+## Development
+
+```bash
+git clone https://github.com/UDLF/pyUDLF.git && cd pyUDLF
+python3 -m venv .venv && .venv/bin/pip install -e ".[viz,test]"
+scripts/build_udlf.sh            # builds UDLF 1.70 from source into .udlf/ (used by the tests)
+.venv/bin/python -m pytest
+```
+
+The tests compare every pyUDLF run with UDLF executed directly on the same configuration, using
+the synthetic dataset in `tests/data/synthetic`. GitHub Actions runs them on every push and pull
+request (`.github/workflows/tests.yml`): Linux with Python 3.9 to 3.13, the built package, and
+Windows / macOS.
 
 
 ## Applications

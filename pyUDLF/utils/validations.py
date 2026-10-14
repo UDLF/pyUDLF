@@ -4,7 +4,10 @@ Generated from config.ini specification.
 """
 
 from pyUDLF.utils.logger import get_logger
+from numbers import Integral
 from pathlib import Path
+
+import numpy as np
 
 logger = get_logger(__name__)
 
@@ -122,7 +125,7 @@ VALIDATIONS = {
     "PARAM_RDPAC_K_INC": {"type": "uint"},
     "PARAM_RDPAC_K_START": {"type": "uint"},
     "PARAM_RDPAC_L": {"type": "uint"},
-    "PARAM_RDPAC_L_MULT": {"type": "uint"},
+    "PARAM_RDPAC_L_MULT": {"type": "float", "min": 0},
     "PARAM_RDPAC_P": {"type": "float", "min": 0, "max": 1},
     "PARAM_RDPAC_PL": {"type": "float", "min": 0, "max": 1},
 
@@ -131,7 +134,7 @@ VALIDATIONS = {
     "PARAM_RFE_T": {"type": "uint"},
     "PARAM_RFE_L": {"type": "uint"},
     "PARAM_RFE_PA": {"type": "float", "min": 0, "max": 1},
-    "PARAM_RFE_TH_CC": {"type": "uint"},
+    "PARAM_RFE_TH_CC": {"type": "float"},
     "PARAM_RFE_RERANK_BY_EMB": {"type": "bool"},
     "PARAM_RFE_EXPORT_EMBEDDINGS": {"type": "bool"},
     "PARAM_RFE_PERFORM_CCS": {"type": "bool"},
@@ -140,6 +143,9 @@ VALIDATIONS = {
 
 # parameters map for each method
 METHOD_PARAMS = {
+    "NONE": {
+        "l": {"param": "PARAM_NONE_L", "default": 1400, "type": int},
+    },
     "CONTEXTRR": {
         "l":   {"param": "PARAM_CONTEXTRR_L", "default": 25, "type": int},
         "k":   {"param": "PARAM_CONTEXTRR_K", "default": 7, "type": int},
@@ -198,7 +204,7 @@ METHOD_PARAMS = {
         "k_inc": {"param": "PARAM_RDPAC_K_INC", "default": 1, "type": int},
         "k_start": {"param": "PARAM_RDPAC_K_START", "default": 1, "type": int},
         "l": {"param": "PARAM_RDPAC_L", "default": 400, "type": int},
-        "l_mult": {"param": "PARAM_RDPAC_L_MULT", "default": 2, "type": int},
+        "l_mult": {"param": "PARAM_RDPAC_L_MULT", "default": 2, "type": float},
         "p": {"param": "PARAM_RDPAC_P", "default": 0.60, "type": float},
         "pl": {"param": "PARAM_RDPAC_PL", "default": 0.99, "type": float},
     },
@@ -207,7 +213,7 @@ METHOD_PARAMS = {
         "t": {"param": "PARAM_RFE_T", "default": 2, "type": int},
         "l": {"param": "PARAM_RFE_L", "default": 400, "type": int},
         "pa": {"param": "PARAM_RFE_PA", "default": 0.1, "type": float},
-        "th_cc": {"param": "PARAM_RFE_TH_CC", "default": 0, "type": int},
+        "th_cc": {"param": "PARAM_RFE_TH_CC", "default": 0, "type": float},
         "rerank_by_emb": {"param": "PARAM_RFE_RERANK_BY_EMB", "default": False, "type": bool},
         "export_embeddings": {"param": "PARAM_RFE_EXPORT_EMBEDDINGS", "default": False, "type": bool},
         "perform_ccs": {"param": "PARAM_RFE_PERFORM_CCS", "default": True, "type": bool},
@@ -216,6 +222,20 @@ METHOD_PARAMS = {
     },
 }
 
+
+
+def matches_type(value, expected_type) -> bool:
+    """Type check for method parameters: an int is a valid float, and a bool
+    is never a number (in Python, bool is a subclass of int)."""
+    if expected_type is bool:
+        return isinstance(value, (bool, np.bool_))
+    if isinstance(value, (bool, np.bool_)):
+        return False
+    if expected_type is int:
+        return isinstance(value, (Integral, np.integer))
+    if expected_type is float:
+        return isinstance(value, (Integral, float, np.integer, np.floating))
+    return isinstance(value, expected_type)
 
 
 def validate_param(key: str, value):
@@ -233,8 +253,7 @@ def validate_param(key: str, value):
     # ENUM
     if t == "enum":
         if isinstance(value, str):
-            val = value.upper()
-            #print(f"DEBUG validate_param: key={key}, raw={value}, normalized={val}, allowed={rules['values']}")
+            val = value.strip().upper()
             if val in rules["values"]:
                 return val
         raise ValueError(f"Invalid value '{value}' for {key}. Allowed: {rules['values']}")
@@ -242,21 +261,25 @@ def validate_param(key: str, value):
     # BOOL
     if t == "bool":
         if isinstance(value, str):
-            val = value.upper()
+            val = value.strip().upper()
             if val in {"TRUE", "FALSE"}:
                 return val
         if isinstance(value, bool):
             return "TRUE" if value else "FALSE"
         raise ValueError(f"Invalid value '{value}' for {key}. Must be TRUE/FALSE.")
 
-    # UINT
+    # UINT (int, numpy integer or a string of digits; bool is not a number here)
     if t == "uint":
-        if isinstance(value, int) and value >= 0:
-            return value
+        if isinstance(value, str) and value.strip().isdigit():
+            return int(value.strip())
+        if isinstance(value, (int, np.integer)) and not isinstance(value, bool) and value >= 0:
+            return int(value)
         raise ValueError(f"Invalid value '{value}' for {key}. Must be unsigned integer.")
 
-    # FLOAT
+    # FLOAT (any real number or numeric string; bool is not a number here)
     if t == "float":
+        if isinstance(value, bool):
+            raise ValueError(f"Invalid value '{value}' for {key}. Must be float.")
         try:
             f = float(value)
         except Exception:
@@ -267,20 +290,21 @@ def validate_param(key: str, value):
             raise ValueError(f"{key} must be <= {rules['max']}")
         return f
 
-    # LIST_UINT
+    # LIST_UINT (comma separated positive integers: UDLF aborts on P@0)
     if t == "list_uint":
         if isinstance(value, str):
-            items = [int(x) for x in value.split(",")]
-            if all(x >= 0 for x in items):
-                return items
-        if isinstance(value, (list, tuple)):
-            if all(isinstance(x, int) and x >= 0 for x in value):
-                return list(value)
-        raise ValueError(f"Invalid value '{value}' for {key}. Must be list of unsigned integers.")
+            parts = [x.strip() for x in value.split(",")]
+            if parts and all(x.isdigit() and int(x) > 0 for x in parts):
+                return [int(x) for x in parts]
+        if isinstance(value, (list, tuple)) and value:
+            if all(isinstance(x, (int, np.integer)) and not isinstance(x, bool) and x > 0
+                   for x in value):
+                return [int(x) for x in value]
+        raise ValueError(f"Invalid value '{value}' for {key}. "
+                         "Must be a list of positive integers.")
 
     return value
 
-from pathlib import Path
 
 def validate_path(value: str, must_exist: bool = False) -> str:
     """
@@ -294,9 +318,11 @@ def validate_path(value: str, must_exist: bool = False) -> str:
         str: the validated path.
 
     Raises:
-        ValueError: if path is invalid, contains spaces/special characters,
-                    or does not exist when must_exist=True.
+        ValueError: if path is invalid, contains characters UDLF cannot read
+                    in a config file, or does not exist when must_exist=True.
     """
+    if isinstance(value, Path):
+        value = str(value)
     if not isinstance(value, str) or not value.strip():
         raise ValueError("Path must be a non-empty string.")
 
@@ -304,11 +330,12 @@ def validate_path(value: str, must_exist: bool = False) -> str:
     path_str = value.strip()
     path = Path(path_str)
 
-    # Basic forbidden characters (expand if needed)
-    forbidden = [' ', '(', ')', '[', ']', '{', '}', ';', '"', "'"]
-    if any(ch in path_str for ch in forbidden):
+    # UDLF removes every space/tab of a config line and treats '#' as the
+    # start of a comment, so such paths would be read as a different path.
+    if any(ch.isspace() for ch in path_str) or "#" in path_str:
         raise ValueError(
-            f"Invalid path '{path_str}'. It contains spaces or forbidden characters."
+            f"Invalid path '{path_str}'. UDLF cannot read paths containing spaces "
+            "or '#' from its config file. Rename the file/folder or use a link."
         )
 
     # Optional existence check

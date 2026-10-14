@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Optional, List, Union
 
 import numpy as np
-from PIL import Image, ImageDraw
 
 from pyUDLF.utils.visualization import render_ranked_list
 
@@ -33,6 +32,7 @@ class OutputType:
         self.images_path: Optional[str] = path
         self.list_path: Optional[str] = path
         self.classes_path: Optional[str] = path
+        self.stdout: str = ""  # everything UDLF printed during the run
 
         logger.debug("OutputType initialized with base path: %r", path)
 
@@ -169,8 +169,9 @@ class OutputType:
         if not self.individual_gain_list:
             logger.warning("individual_gain_list is empty. Returning [].")
             return []
-        # Pair each gain with its index
-        paired = [(gain, idx) for idx, gain in enumerate(self.individual_gain_list)]
+        # compute_gain already returns (gain, index) pairs; plain gains are paired here
+        paired = [item if isinstance(item, tuple) else (item, idx)
+                  for idx, item in enumerate(self.individual_gain_list)]
 
         # Optionally sort
         if sort:
@@ -213,7 +214,6 @@ class OutputType:
         Raises:
             ValueError: if line is not a valid index.
         """
-        print(self.rk_path, self.list_path, self.classes_path, self.images_path)
         if type(line) is not int or line < 0:
             raise ValueError(f"line must be a non-negative integer, got {line!r}")#print(self.rk_path, self.list_path, self.classes_path, self.images_path)
         return render_ranked_list(

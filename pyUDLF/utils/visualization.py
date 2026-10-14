@@ -1,6 +1,5 @@
 from pathlib import Path
 import numpy as np
-from PIL import Image, ImageDraw
 from pyUDLF.utils import readData
 from pyUDLF.utils.logger import get_logger
 
@@ -36,6 +35,15 @@ def render_ranked_list(
     Returns:
         PIL.Image.Image or Path: combined image, or saved path.
     """
+    # Pillow is an optional dependency (pip install "pyUDLF[viz]")
+    try:
+        from PIL import Image, ImageDraw
+    except ImportError as e:
+        raise ImportError(
+            "Ranked list visualization requires Pillow. "
+            'Install it with: pip install "pyUDLF[viz]"'
+        ) from e
+
     # --- Sanity checks ---
     if type(line) is not int or line < 0:
         raise ValueError(f"line must be a non-negative integer, got {line!r}")

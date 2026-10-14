@@ -1,0 +1,104 @@
+# Runs the test suite on every push and pull request.
+#
+# - tests:   Linux, every supported Python version, against UDLF 1.70 built
+#            from source (scripts/build_udlf.sh)
+# - package: builds the wheel/sdist, installs the wheel in a clean
+#            environment, runs the tests against the installed package and
+#            installs the official UDLF release with `pyudlf download`
+# - other-os: Windows (official UDLF release) and macOS (UDLF built from
+#            source)
+
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Linux / Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Build UDLF 1.70 from source
+        run: scripts/build_udlf.sh
+      - name: Install pyUDLF
+        run: python -m pip install -e ".[viz,test]"
+      - name: Run tests
+        run: python -m pytest -q
+
+  package:
+    name: Package (wheel, sdist, official release)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Build UDLF 1.70 from source
+        run: scripts/build_udlf.sh
+      - name: Build wheel and sdist
+        run: |
+          python -m pip install build
+          python -m build -o dist
+      - name: Install the wheel in a clean environment
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install "$(ls dist/*.whl)[test]"
+      - name: Run tests against the installed package
+        # from outside the source tree, so the installed package is imported
+        working-directory: ${{ runner.temp }}
+        env:
+          UDLF_BIN: ${{ github.workspace }}/.udlf/UDLF/bin/udlf
+        run: |
+          "$RUNNER_TEMP/venv/bin/python" -c "import pyUDLF; print(pyUDLF.__file__)"
+          "$RUNNER_TEMP/venv/bin/python" -m pytest -q "$GITHUB_WORKSPACE/tests"
+      - name: Install the official UDLF release and run the quickstart with it
+        working-directory: ${{ runner.temp }}
+        env:
+          PYUDLF_HOME: ${{ runner.temp }}/pyudlf_home
+        run: |
+          "$RUNNER_TEMP/venv/bin/pyudlf" download
+          "$RUNNER_TEMP/venv/bin/pyudlf" where
+          "$RUNNER_TEMP/venv/bin/python" "$GITHUB_WORKSPACE/examples/quickstart.py"
+
+  other-os:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install pyUDLF
+        run: python -m pip install -e ".[viz,test]"
+      - name: Install the official UDLF release (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          pyudlf download --dest "$RUNNER_TEMP/pyudlf_home"
+          echo "UDLF_BIN=$RUNNER_TEMP/pyudlf_home/bin/udlf.exe" >> "$GITHUB_ENV"
+      - name: Build UDLF 1.70 from source (macOS has no official build)
+        if: runner.os == 'macOS'
+        run: |
+          scripts/build_udlf.sh
+          echo "UDLF_BIN=$GITHUB_WORKSPACE/.udlf/UDLF/bin/udlf" >> "$GITHUB_ENV"
+      - name: Run the quickstart
+        run: python examples/quickstart.py
+      - name: Run tests
+        run: python -m pytest -q

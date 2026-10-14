@@ -2,10 +2,52 @@ import os
 from pyUDLF.utils import configGenerator
 from pyUDLF import run_calls
 from pyUDLF.utils.logger import get_logger
-from pyUDLF.utils.validations import validate_param, validate_path, METHOD_PARAMS
+from pyUDLF.utils.validations import validate_param, validate_path, METHOD_PARAMS, matches_type
 from pyUDLF.utils.visualization import render_ranked_list
 from pathlib import Path
+from numbers import Integral
+import numpy as np
 logger = get_logger(__name__)
+
+
+def _as_ranked_lists_matrices(value):
+    """
+    If value holds in-memory ranked lists, return them as a list of matrices
+    (one per input file). Return None for paths and lists of paths.
+
+    Accepted: a 2D array / list of rows (one matrix), a 3D array or a list of
+    those (several matrices, FUSION).
+
+    Raises:
+        ValueError: if the ranked lists are not integer indices.
+    """
+    if isinstance(value, np.ndarray):
+        if value.ndim == 2:
+            matrices = [value]
+        elif value.ndim == 3:
+            matrices = list(value)
+        else:
+            raise ValueError(f"In-memory ranked lists must be 2D or 3D, got {value.ndim}D.")
+    elif isinstance(value, list) and value and not isinstance(value[0], (str, os.PathLike)):
+        first = value[0]
+        if isinstance(first, np.ndarray) and first.ndim == 2:
+            matrices = value
+        elif isinstance(first, (list, tuple)) and first and \
+                isinstance(first[0], (list, tuple, np.ndarray)):
+            matrices = value
+        else:
+            matrices = [value]
+    else:
+        return None
+
+    for matrix in matrices:
+        first_row = matrix[0]
+        if len(first_row) == 0 or not all(isinstance(x, (Integral, np.integer))
+                                          for x in first_row):
+            raise ValueError(
+                "In-memory input must be ranked lists of integer image indices "
+                "(one row per query). Write matrices to a file and pass its path.")
+    return matrices
 
 class InputType:
     """
@@ -21,8 +63,11 @@ class InputType:
         Initialize the InputType instance.
 
         Args:
-            config_path (str, optional): Path to the UDLF config file. If None,
-                                         the default from run_calls is used.
+            config_path (str, optional): Path of the config used as template
+                                         (initial values of all parameters). If
+                                         None, run_calls.config_path is used: the
+                                         UDLF v1.70 config shipped with pyUDLF,
+                                         unless changed with setConfigPath.
             input_files (str | list | list[list], optional): Input files to
                                          initialize immediately.
                                          - str: single file path
@@ -34,14 +79,9 @@ class InputType:
         self.list_parameters = []
         self.input_files_list = input_files
         self.config_path = config_path
-        # If no config path is provided, use default from run_calls
-        # and ensure the binary/config are available
         if self.config_path is None:
             self.config_path = run_calls.config_path
-            if not os.path.isfile(self.config_path):
-                logger.warning("Config is missing! Will try to install/verify UDLF assets.")
-                run_calls.verify_bin(self.config_path, run_calls.bin_path)
-            logger.info("InputType initialized.")
+            logger.debug("InputType initialized from %s", self.config_path)
 
         # Load parameters from config; abort initialization if it fails
         ok = self.init_parameters(self.config_path)  # now returns bool
@@ -85,38 +125,10 @@ class InputType:
         Raises:
             ValueError: if the input_files_list type is not supported.
         """
-        if not self.input_files_list:
+        if self.input_files_list is None or len(self.input_files_list) == 0:
             logger.warning("Input files list is empty. Nothing to initialize.")
             return
-
-        # Case 1: single path
-        if isinstance(self.input_files_list, str):
-            logger.debug("Initializing data with a single path.")
-            self.set_input_files(self.input_files_list)
-            return
-
-        # Case 2: list input
-        if isinstance(self.input_files_list, list):
-            first_elem = self.input_files_list[0]
-
-            # Case 2a: list of paths
-            if isinstance(first_elem, str):
-                logger.debug("Initializing data with a list of paths.")
-                self.set_input_files(self.input_files_list)
-                return
-
-            # Case 2b: list of lists
-            if isinstance(first_elem, list):
-                logger.debug("Initializing data with a list of ranked lists (will be written to disk).")
-                aux = os.path.dirname(self.config_path)
-                data_paths = configGenerator.write_input_files(
-                    self.input_files_list, aux
-                )
-                self.set_input_files(data_paths)
-                return
-
-        # Case not recognized
-        logger.error("Unsupported type for input_files_list: %s", type(self.input_files_list))
+        self.set_input_files(self.input_files_list)
 
     def _set_validated(self, key: str, value):
         """
@@ -153,7 +165,8 @@ class InputType:
             else:
                 raise ValueError(f"{key} must be a list[int] or CSV string, got {type(normalized)}")
 
-        configGenerator.setParameter(key, normalized, self.parameters)
+        # known UDLF parameters missing from the template config are added
+        configGenerator._set_or_add(key, normalized, self.parameters, self.list_parameters)
         logger.debug("%s set to %r", key, normalized)
 
     def set_method_name(self, value: str) -> None:
@@ -471,18 +484,34 @@ class InputType:
         Set the input files.
 
         Accepts:
-            - str: path to a single file.
-            - list[str]: multiple file paths (fusion).
-            - list[list]: ranked lists to be written to disk.
+            - str: path to a single file (UDL task).
+            - list[str]: multiple file paths (FUSION task when 2 or more).
+            - in-memory ranked lists (integer indices, one row per query):
+              a list of rows or a 2D numpy array (UDL task), or a list of
+              those (FUSION task). They are written to text files in a new
+              temporary directory, and the input format is set to RK / NUM.
 
         Raises:
             TypeError: if value type is unsupported.
             ValueError: if list is empty or contains invalid paths.
         """
+        if isinstance(value, os.PathLike):
+            value = os.fspath(value)
+
+        matrices = _as_ranked_lists_matrices(value)
+        if matrices is not None:
+            data_paths = configGenerator.write_input_files(matrices)
+            logger.info("In-memory ranked lists written to %s",
+                        os.path.dirname(data_paths[0]))
+            self.set_input_files(data_paths)
+            self._set_validated("INPUT_FILE_FORMAT", "RK")
+            self._set_validated("INPUT_RK_FORMAT", "NUM")
+            return
+
         if not isinstance(value, (str, list)):
             raise TypeError(
                 f"Invalid input type for set_input_files: {type(value)}. "
-                "Must be str, list[str], or list[list]."
+                "Must be str, list[str], or in-memory ranked lists."
             )
 
         self.input_files_list = value
@@ -492,14 +521,10 @@ class InputType:
             if len(value) == 0:
                 raise ValueError("Input file list cannot be empty.")
 
-            # Case 1a: list of lists -> write them as files first
-            if isinstance(value[0], list):
-                aux = os.path.dirname(self.config_path)
-                data_paths = configGenerator.write_input_files(self.input_files_list, aux)
-                self.set_input_files(data_paths)
-                return
+            value = [os.fspath(v) if isinstance(v, os.PathLike) else v for v in value]
+            self.input_files_list = value
 
-            # Case 1b: list of strings -> validate each path
+            # list of strings -> validate each path
             if not all(isinstance(elem, str) for elem in value):
                 raise TypeError("All elements of input_files_list must be strings.")
 
@@ -586,24 +611,35 @@ class InputType:
         Args:
             param (str): parameter name (must not be empty).
             value: parameter value.
+
+        Raises:
+            ValueError: if the parameter already exists (use set_param).
         """
         if not isinstance(param, str) or not param.strip():
             raise ValueError("Parameter name must be a non-empty string.")
+        if param.upper().strip() in self.parameters:
+            raise ValueError(f"{param.upper().strip()} already exists. Use set_param() "
+                             "to change its value.")
         configGenerator.new_parameters(
             param, value, self.parameters, self.list_parameters
         )
 
     def add_input_files(self, value) -> None:
         """
-        Add new input files in fusion mode.
+        Add new input files in fusion mode, after the ones already set.
 
         Args:
             value (str | list): new file(s) to add.
+
+        Raises:
+            ValueError: if the task is not FUSION or a path does not exist.
         """
         if not isinstance(value, (str, list)):
             raise TypeError(
                 f"Invalid type for input files: {type(value)}. Must be str or list."
             )
+        for path in [value] if isinstance(value, str) else value:
+            validate_path(path, must_exist=True)
         configGenerator.new_fusion_parameter(
             value, self.parameters, self.list_parameters
         )
@@ -622,55 +658,69 @@ class InputType:
         """
         Change the value of an existing parameter.
 
+        Values of known UDLF parameters are validated (type, allowed values)
+        and normalized, as in the specific setters.
+
         Args:
             param (str): name of the parameter to change (must exist).
             value: new value for the parameter.
+
+        Raises:
+            KeyError: if the parameter is not in the config
+                      (use add_new_parameter to add it).
+            ValueError: if the value is not valid for the parameter.
         """
         if not isinstance(param, str) or not param.strip():
             raise ValueError("Parameter name must be a non-empty string.")
-        configGenerator.setParameter(param, value, self.parameters)
+        name = param.upper().strip()
+        if name not in self.parameters:
+            raise KeyError(f"{name} is not in the config. "
+                           "Use add_new_parameter() to add a new parameter.")
+        self._set_validated(name, value)
     
-    def set_method_parameters(self, method: str, **kwargs) -> None:
+    def set_method_parameters(self, method: str, reset_defaults: bool = False,
+                              **kwargs) -> None:
         """
-        Set multiple parameters for a specific UDLF method in one call.
+        Set several parameters of a UDLF method in one call.
 
-        This function allows configuring all parameters related to a given method
-        (e.g., CPRR, RFE, RDPAC) at once. Missing parameters are automatically
-        filled with their default values, as defined in METHOD_PARAMS.
+        Only the parameters passed are changed; the others keep their current
+        values. With reset_defaults=True, every parameter not passed is set to
+        its default value (as defined in METHOD_PARAMS).
 
         Args:
             method (str): the method name (e.g., "CPRR", "RFE", "RDPAC").
-            **kwargs: key-value pairs of parameters specific to the method.
-                The keys must match the shorthand names defined in METHOD_PARAMS.
+            reset_defaults (bool): reset the parameters not passed to defaults.
+            **kwargs: parameters of the method, by the short names defined in
+                METHOD_PARAMS (case-insensitive).
 
                 Example:
-                    set_method_parameters("CPRR", k=10, alpha=0.5)
+                    set_method_parameters("CPRR", l=400, k=20)
 
         Raises:
-            ValueError: if the method is not supported, or if an invalid parameter
-                        name is provided in kwargs.
+            ValueError: if the method is not supported, a parameter name is
+                        unknown, or a value has the wrong type.
         """
         method = method.upper()
         if method not in METHOD_PARAMS:
             raise ValueError(f"Unsupported method: {method}")
 
         param_map = METHOD_PARAMS[method]
+        given = {key.lower(): value for key, value in kwargs.items()}
+        unknown = sorted(set(given) - set(param_map))
+        if unknown:
+            raise ValueError(f"Unknown parameter(s) {unknown} for method {method}. "
+                             f"Valid names: {sorted(param_map)}")
 
-        # for key, spec in param_map.items():
-        #     if key in kwargs:
-        #         value = kwargs[key]
-        #     else:
-        #         value = spec.get("default")
-        #     self._set_validated(spec["param"], value)
         for key, spec in param_map.items():
-            if key in kwargs:
-                value = kwargs[key]
-            else:
+            if key in given:
+                value = given[key]
+            elif reset_defaults:
                 value = spec.get("default")
+            else:
+                continue
 
-            # type verification
             expected_type = spec.get("type")
-            if expected_type is not None and not isinstance(value, expected_type):
+            if expected_type is not None and not matches_type(value, expected_type):
                 raise ValueError(
                     f"Invalid type for parameter '{key}' in method {method}. "
                     f"Expected {expected_type.__name__}, got {type(value).__name__}."

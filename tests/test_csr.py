@@ -275,6 +275,14 @@ def test_binary_from_environment(csr_bin, tmp_path, monkeypatch):
         UDLF(backend="csr")
 
 
+def test_relative_binary_path(csr_bin, rks, labels, monkeypatch):
+    """UDLF-CSR runs in the run directory, so a relative path must still work."""
+    monkeypatch.chdir(csr_bin.parent.parent)
+    backend = UDLF(bin_path=os.path.join("bin", csr_bin.name), backend="csr", threads=1)
+    res = backend.run("CPRR", ranked_lists=rks, classes=labels, params=PARAMS)
+    assert res.ranked_lists.shape == (N, PARAMS["l"])
+
+
 @pytest.mark.parametrize("kwargs, error, message", [
     (dict(method="RDPAC"), UDLFParamError, "only"),
     (dict(engine="cuda"), UDLFParamError, "engine"),

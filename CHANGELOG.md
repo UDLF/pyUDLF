@@ -81,6 +81,8 @@ configuration (12 methods, all input/output formats, fusion), on a synthetic dat
   and `find_best_method_with_best_k` used a fixed ranked list size of 280.
 - Windows: the official archive (`.tar.gz`) was opened as a zip, so the download never worked;
   the binary is now run directly (not through `cmd /c`).
+- `UDLF(bin_path=..., backend="csr")` with a relative path failed: UDLF-CSR runs in the run
+  directory. The binary path is now made absolute.
 
 ### Removed
 - `setup.py`, `requirements.txt`, `install.sh` and the empty `PKG-INFO`.

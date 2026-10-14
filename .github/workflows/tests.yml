@@ -6,8 +6,7 @@
 #            environment, runs the tests against the installed package and
 #            installs the official UDLF release with `pyudlf download`
 # - other-os: Windows (official UDLF release) and macOS (UDLF built from
-#            source). Informational for now: a failure there does not fail
-#            the workflow.
+#            source)
 
 name: tests
 
@@ -28,8 +27,8 @@ jobs:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
       - name: Build UDLF 1.70 from source
@@ -43,8 +42,8 @@ jobs:
     name: Package (wheel, sdist, official release)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Build UDLF 1.70 from source
@@ -75,16 +74,15 @@ jobs:
           "$RUNNER_TEMP/venv/bin/python" "$GITHUB_WORKSPACE/examples/quickstart.py"
 
   other-os:
-    name: ${{ matrix.os }} (informational)
+    name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install pyUDLF

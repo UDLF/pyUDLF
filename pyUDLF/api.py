@@ -969,7 +969,10 @@ def _repeated_elements_warning(rks):
         return []
     message = (f"{rows} of {len(rks)} ranked lists returned by UDLF-CSR contain repeated "
                f"elements in their top {rks.shape[1]}; each repetition is counted by the "
-               "evaluation, so the measures may be inflated.")
+               "evaluation, so the measures may be inflated. This happens when l is larger "
+               "than the number of elements the engine scores for a query (those reachable "
+               "from its k nearest neighbors): only that many positions are rewritten and the "
+               "rest keep the previous ranking. A larger k or a smaller l avoids it.")
     logger.warning(message)
     return [message]
 

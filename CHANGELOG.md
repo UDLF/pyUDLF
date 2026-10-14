@@ -88,7 +88,13 @@ configuration (12 methods, all input/output formats, fusion), on a synthetic dat
   1400 (the repository value, also the previous `set_method_parameters()` default).
 - UDLF-CSR (commit `b391800`), to report upstream; pyUDLF detects or works around them:
   - the `sparse` engines return ranked lists with repeated elements in the top L, which
-    inflates the measures (warning in `Result.warnings`);
+    inflates the measures (warning in `Result.warnings`). Cause: `updateRankedLists` in
+    `CprrSparse.hpp` and `LHRRSparse.hpp` (same pattern in `LHRRMKL.hpp` and `CprrEigen.hpp`)
+    rewrites only the first min(scored elements, L) positions; when a query has fewer scored
+    elements than L (those reachable from its k neighbors), the other positions keep the
+    previous ranking, which repeats elements already placed. It depends on L relative to k,
+    not on L relative to N (synthetic data, L = 100: k = 5 repeats in every list, k = 30 in
+    none);
   - the `dense` engines are not deterministic with several threads (use `threads=1`), and
     their results differ from UDLF's CPRR and LHRR (e.g. Flowers, CPRR MAP 0.6173 vs 0.6382);
   - `VirtualArray::create` passes a dangling pointer as file name: intermittent "Failed to

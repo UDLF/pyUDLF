@@ -26,7 +26,10 @@ configuration (12 methods, all input/output formats, fusion), on a synthetic dat
 - `UDLF(threads=...)` sets the number of threads of the binary (`OMP_NUM_THREADS`).
 - `Result.warnings`: problems found in the results.
 - In-memory ranked lists as numpy arrays in `InputType.set_input_files`.
-- `pyproject.toml` packaging, `examples/`, and a test suite (`pytest`).
+- `pyproject.toml` packaging and a test suite (`pytest`).
+- `examples/`: runnable scripts (quickstart, comparing methods, parameter search, input formats,
+  fusion, per-query analysis, your own data from the command line, UDLF-CSR engines, legacy API),
+  all run by the tests.
 - Continuous integration (GitHub Actions): Linux with Python 3.9 to 3.13, the built package
   with the official UDLF release, Windows (official UDLF release) and macOS (UDLF built from
   source).

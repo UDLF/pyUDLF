@@ -31,8 +31,10 @@ METHODS = ("CPRR", "LHRR")
 PINNED_COMMIT = "b391800"
 
 # Startup error caused by a dangling pointer in VirtualArray::create (the name of
-# the memory-mapped file); it happens at random, before any computation.
+# the memory-mapped file); it happens at random (about 1-5% of the runs, every
+# engine), before any computation, so the run is repeated up to RUN_ATTEMPTS times.
 TRANSIENT_ERROR = "Failed to open backing file"
+RUN_ATTEMPTS = 5
 
 _ERROR_PATTERNS = [
     re.compile(r"^Execution Error: (.*)$", re.M),

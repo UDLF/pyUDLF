@@ -562,7 +562,7 @@ class UDLF:
                           evaluation_data=evaluation_data, warnings=warnings,
                           raw_metrics=raw)
 
-    def _execute_csr(self, config_path, cwd=None, attempts=3):
+    def _execute_csr(self, config_path, cwd=None, attempts=csr.RUN_ATTEMPTS):
         """Run UDLF-CSR; repeat runs that fail with its intermittent startup
         error (before any computation), recording it as a warning."""
         warnings = []

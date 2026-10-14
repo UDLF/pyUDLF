@@ -71,7 +71,7 @@ def run_csr_direct(csr_bin, data, workdir, csr_method, **kwargs):
     cfg = workdir / "direct.ini"
     cfg.write_text(csr_config(data, csr_method, workdir, **kwargs))
     env = dict(os.environ, OMP_NUM_THREADS="1")
-    for _ in range(3):  # intermittent UDLF-CSR startup error, see csr.TRANSIENT_ERROR
+    for _ in range(csr.RUN_ATTEMPTS):  # intermittent UDLF-CSR startup error, see csr.TRANSIENT_ERROR
         proc = subprocess.run([str(csr_bin), str(cfg)], capture_output=True, text=True,
                               cwd=workdir, env=env)
         if csr.TRANSIENT_ERROR not in proc.stdout + proc.stderr:

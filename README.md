@@ -178,6 +178,36 @@ res = udlf.fuse("CPRR", [ranked_lists, ranked_lists_cosine], params={"l": 100}, 
 res.map_after             # FUSION results only have metrics after fusion
 ```
 
+### UDLF-CSR
+
+[UDLF-CSR](https://github.com/andreTomi/UDLF-CSR) is a rewrite of UDLF that runs CPRR and LHRR
+with several engines (`dense`, `sparse`, `mkl`, `blas`, `eigen`) to scale to large datasets.
+It has no official build: compile it (`scripts/build_csr.sh` builds the `dense` and `sparse`
+engines; `scripts/build_csr.sh --full` builds all of them and needs Intel MKL, GraphBLAS and
+Eigen) and pass its path with `bin_path=` or the `UDLF_CSR_BIN` environment variable.
+
+```python
+csr = UDLF(backend="csr", threads=1)      # binary from UDLF_CSR_BIN
+res = csr.run("CPRR", ranked_lists=ranked_lists, params={"l": 100, "k": 10},
+              classes=labels, engine="sparse")
+print(res)   # Result(method='CPRR_SPARSE', ranked_lists=(200, 100), MAP 0.5471 -> 0.7633)
+res.warnings                              # problems found in the results (see below)
+res.raw_metrics                           # measures computed by UDLF-CSR itself
+```
+
+The result is the same `Result` as with UDLF. `metrics` are computed by pyUDLF with the UDLF
+definitions, so UDLF and UDLF-CSR results are directly comparable (UDLF-CSR averages the recall
+per query, not per class). UDLF-CSR only takes ranked lists of element indices (no matrix,
+names or fusion); `output="matrix"` gives its distance matrix. Behaviors of UDLF-CSR (commit
+`b391800`) handled by pyUDLF:
+
+- the `sparse` engines return ranked lists with repeated elements, which inflates the measures:
+  reported in `res.warnings`;
+- the `dense` engines give slightly different results from run to run with several threads:
+  use `threads=1` for reproducible results;
+- an intermittent startup error ("Failed to open backing file") is retried automatically and
+  reported in `res.warnings`.
+
 ### Errors
 
 Problems are reported as exceptions, before running UDLF whenever possible:

@@ -182,6 +182,36 @@ res = udlf.fuse("CPRR", [ranked_lists, ranked_lists_cosine], params={"l": 100}, 
 res.map_after             # FUSION results only have metrics after fusion
 ```
 
+### UDLF-CSR
+
+O [UDLF-CSR](https://github.com/andreTomi/UDLF-CSR) é uma reescrita do UDLF que roda CPRR e LHRR
+com vários motores (`dense`, `sparse`, `mkl`, `blas`, `eigen`) para escalar a datasets grandes.
+Ele não tem build oficial: compile-o (`scripts/build_csr.sh` compila os motores `dense` e
+`sparse`; `scripts/build_csr.sh --full` compila todos e precisa de Intel MKL, GraphBLAS e Eigen) e
+passe o caminho com `bin_path=` ou com a variável de ambiente `UDLF_CSR_BIN`.
+
+```python
+csr = UDLF(backend="csr", threads=1)      # binary from UDLF_CSR_BIN
+res = csr.run("CPRR", ranked_lists=ranked_lists, params={"l": 100, "k": 10},
+              classes=labels, engine="sparse")
+print(res)   # Result(method='CPRR_SPARSE', ranked_lists=(200, 100), MAP 0.5471 -> 0.7633)
+res.warnings                              # problems found in the results (see below)
+res.raw_metrics                           # measures computed by UDLF-CSR itself
+```
+
+O resultado é o mesmo `Result` do UDLF. As `metrics` são calculadas pelo pyUDLF com as definições
+do UDLF, então resultados do UDLF e do UDLF-CSR são diretamente comparáveis (o UDLF-CSR calcula o
+recall com média por consulta, não por classe). O UDLF-CSR só aceita listas ranqueadas com índices
+(sem matriz, nomes ou fusão); `output="matrix"` devolve a matriz de distância dele.
+Comportamentos do UDLF-CSR (commit `b391800`) tratados pelo pyUDLF:
+
+- os motores `sparse` devolvem listas com elementos repetidos, o que infla as medidas: isso é
+  informado em `res.warnings`;
+- os motores `dense` dão resultados ligeiramente diferentes a cada execução com várias threads:
+  use `threads=1` para resultados reproduzíveis;
+- um erro intermitente na inicialização ("Failed to open backing file") é repetido
+  automaticamente e informado em `res.warnings`.
+
 ### Erros
 
 Problemas viram exceções, sempre que possível antes de executar o UDLF:

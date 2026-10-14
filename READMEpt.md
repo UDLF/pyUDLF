@@ -14,6 +14,7 @@ Departamento de Estatística, Matemática Aplicada e Computação, Universidade 
 * [Visão geral](#visão-geral)
 * [Instalação](#instalação)
 * [Início rápido](#início-rápido)
+* [Exemplos](#exemplos)
 * [Uso](#uso)
 * [Rodando o seu próprio config](#rodando-o-seu-próprio-config)
 * [API antiga](#api-antiga)
@@ -36,7 +37,8 @@ contêm, sem rótulos.
 O pyUDLF executa esses métodos a partir do Python: você passa arrays numpy (ou arquivos) e recebe
 de volta as listas re-ranqueadas e as medidas de avaliação (MAP, Precision@k, Recall@k) como
 arrays numpy e números. Os arquivos de configuração, os arquivos de entrada e o binário do UDLF
-ficam por conta do pyUDLF.
+ficam por conta do pyUDLF. A mesma API também roda o [UDLF-CSR](#udlf-csr), que implementa CPRR e LHRR com motores esparsos
+para datasets grandes.
 
 Métodos (UDLF 1.70), com os nomes e artigos listados pelo UDLF:
 
@@ -106,6 +108,22 @@ print((after > before).sum(), "of 200 queries improved")                  # 186 
 O exemplo gera 200 elementos em 10 classes, monta as listas ranqueadas pela distância euclidiana
 e as re-ranqueia com o CPRR: o MAP sobe de 0,5471 para 0,7602 e 186 das 200 consultas melhoram.
 Este script também está em [examples/quickstart.py](examples/quickstart.py).
+
+
+## Exemplos
+
+Scripts prontos para rodar em [examples/](examples/README.md), com o dataset sintético do repositório (`python examples/<script>.py`). Os testes executam todos eles.
+
+| Script | O que mostra |
+|---|---|
+| [compare_methods.py](examples/compare_methods.py) | os 12 métodos na mesma entrada, ordenados pelo MAP |
+| [parameter_search.py](examples/parameter_search.py) | busca em grade de `k` e `l` |
+| [input_formats.py](examples/input_formats.py) | listas ranqueadas (numpy, arquivo, nomes) e matrizes de distância / similaridade |
+| [fusion.py](examples/fusion.py) | fusão de dois descritores |
+| [per_query_analysis.py](examples/per_query_analysis.py) | consultas que melhoraram ou pioraram |
+| [your_own_data.py](examples/your_own_data.py) | linha de comando para os seus arquivos |
+| [csr_engines.py](examples/csr_engines.py) | UDLF comparado aos motores do UDLF-CSR |
+| [legacy_api.py](examples/legacy_api.py) | a API das versões anteriores |
 
 
 ## Uso

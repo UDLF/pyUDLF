@@ -26,7 +26,10 @@ configuration (12 methods, all input/output formats, fusion), on a synthetic dat
 - `UDLF(threads=...)` sets the number of threads of the binary (`OMP_NUM_THREADS`).
 - `Result.warnings`: problems found in the results.
 - In-memory ranked lists as numpy arrays in `InputType.set_input_files`.
-- `pyproject.toml` packaging, `examples/`, and a test suite (`pytest`).
+- `pyproject.toml` packaging and a test suite (`pytest`).
+- `examples/`: runnable scripts (quickstart, comparing methods, parameter search, input formats,
+  fusion, per-query analysis, your own data from the command line, UDLF-CSR engines, legacy API),
+  all run by the tests.
 - Continuous integration (GitHub Actions): Linux with Python 3.9 to 3.13, the built package
   with the official UDLF release, Windows (official UDLF release) and macOS (UDLF built from
   source).
@@ -48,6 +51,7 @@ configuration (12 methods, all input/output formats, fusion), on a synthetic dat
   that does not exist (use `add_new_parameter()`).
 - `setBinaryPath()` / `setConfigPath()` raise `FileNotFoundError` for a missing file instead of
   silently using the default path.
+- The `UDLF_BIN` environment variable sets the binary of the legacy API too (as in `pyUDLF.UDLF`).
 - `evaluation.compute_map()` divides the average precision by `min(depth, class size)` and
   `compute_recall()` averages per class, as UDLF; values differ from 0.8 when the depth is
   smaller than a class, or (recall) when classes have different sizes.
@@ -78,6 +82,8 @@ configuration (12 methods, all input/output formats, fusion), on a synthetic dat
   and `find_best_method_with_best_k` used a fixed ranked list size of 280.
 - Windows: the official archive (`.tar.gz`) was opened as a zip, so the download never worked;
   the binary is now run directly (not through `cmd /c`).
+- `UDLF(bin_path=..., backend="csr")` with a relative path failed: UDLF-CSR runs in the run
+  directory. The binary path is now made absolute.
 
 ### Removed
 - `setup.py`, `requirements.txt`, `install.sh` and the empty `PKG-INFO`.

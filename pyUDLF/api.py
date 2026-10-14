@@ -722,7 +722,8 @@ def _find_binary(bin_path, backend="udlf"):
         if backend == "csr":
             hint = "Build UDLF-CSR with scripts/build_csr.sh."
         raise UDLFNotFoundError(f"UDLF binary not found at {path} ({origin}). {hint}")
-    return path
+    # absolute: UDLF-CSR runs in the run directory (its output path is relative to it)
+    return os.path.abspath(path)
 
 
 def _detect_backend(bin_path):

@@ -14,6 +14,7 @@ Dept. of Statistic, Applied Math. and Computing, Universidade Estadual Paulista 
 * [Overview](#overview)
 * [Installation](#installation)
 * [Quickstart](#quickstart)
+* [Examples](#examples)
 * [Usage](#usage)
 * [Running your own config file](#running-your-own-config-file)
 * [Legacy API](#legacy-api)
@@ -35,6 +36,8 @@ re-ranks them using the contextual information they contain, with no labels.
 pyUDLF runs these methods from Python: you pass numpy arrays (or files) and get back
 the re-ranked lists and the evaluation measures (MAP, Precision@k, Recall@k) as numpy arrays
 and numbers. The configuration files, input files and the UDLF binary are handled for you.
+The same API also runs [UDLF-CSR](#udlf-csr), which implements CPRR and LHRR with sparse engines for large
+datasets.
 
 Methods (UDLF 1.70), with the names and papers listed by UDLF:
 
@@ -102,6 +105,22 @@ print((after > before).sum(), "of 200 queries improved")                  # 186 
 ```
 
 This script is also in [examples/quickstart.py](examples/quickstart.py).
+
+
+## Examples
+
+Runnable scripts in [examples/](examples/README.md), on the synthetic dataset of the repository (`python examples/<script>.py`). The tests run all of them.
+
+| Script | What it shows |
+|---|---|
+| [compare_methods.py](examples/compare_methods.py) | all 12 methods on the same input, ranked by MAP |
+| [parameter_search.py](examples/parameter_search.py) | grid search over `k` and `l` |
+| [input_formats.py](examples/input_formats.py) | ranked lists (numpy, file, names) and distance / similarity matrices |
+| [fusion.py](examples/fusion.py) | fusion of two descriptors |
+| [per_query_analysis.py](examples/per_query_analysis.py) | queries that improved or got worse |
+| [your_own_data.py](examples/your_own_data.py) | command line for your own files |
+| [csr_engines.py](examples/csr_engines.py) | UDLF vs the UDLF-CSR engines |
+| [legacy_api.py](examples/legacy_api.py) | the API of previous versions |
 
 
 ## Usage

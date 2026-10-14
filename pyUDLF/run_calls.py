@@ -15,13 +15,15 @@ logger = get_logger(__name__)
 pyudlf_dir = install.pyudlf_home()  # ~/.pyudlf or PYUDLF_HOME
 udlf_install_path = pyudlf_dir / "bin"
 
-bin_path = str(install.default_binary_path())
+# The UDLF_BIN environment variable overrides the default location, as in pyUDLF.UDLF
+default_bin_path = str(install.default_binary_path())
+bin_path = os.path.expanduser(os.environ.get("UDLF_BIN") or default_bin_path)
 # Template of new InputType objects: the reference config.ini of UDLF v1.70,
 # shipped with pyUDLF, so the defaults do not depend on a downloaded file.
 bundled_config_path = str(Path(__file__).resolve().parent / "data" / "config.ini")
 config_path = bundled_config_path
 
-original_bin_path = bin_path
+original_bin_path = default_bin_path
 original_config_path = config_path
 
 # ---------- Detect OS ----------

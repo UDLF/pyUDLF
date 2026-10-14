@@ -1,7 +1,8 @@
 # Runs the test suite on every push and pull request.
 #
 # - tests:   Linux, every supported Python version, against UDLF 1.70 built
-#            from source (scripts/build_udlf.sh)
+#            from source (scripts/build_udlf.sh) and UDLF-CSR (dense and
+#            sparse engines, scripts/build_csr.sh)
 # - package: builds the wheel/sdist, installs the wheel in a clean
 #            environment, runs the tests against the installed package and
 #            installs the official UDLF release with `pyudlf download`
@@ -33,6 +34,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Build UDLF 1.70 from source
         run: scripts/build_udlf.sh
+      - name: Build UDLF-CSR (dense and sparse engines)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libtbb-dev
+          scripts/build_csr.sh
       - name: Install pyUDLF
         run: python -m pip install -e ".[viz,test]"
       - name: Run tests

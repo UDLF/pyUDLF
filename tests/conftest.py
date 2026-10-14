@@ -81,6 +81,19 @@ def udlf_bin():
 
 
 @pytest.fixture(scope="session")
+def csr_bin():
+    """UDLF-CSR binary: UDLF_CSR_BIN, or .udlf/UDLF-CSR/Source/bin/udlf
+    (built by scripts/build_csr.sh). Tests that need it are skipped otherwise."""
+    env = os.environ.get("UDLF_CSR_BIN")
+    path = Path(env).expanduser() if env else \
+        REPO_ROOT / ".udlf" / "UDLF-CSR" / "Source" / "bin" / "udlf"
+    if not path.is_file():
+        pytest.skip(f"UDLF-CSR binary not found at {path}. Run scripts/build_csr.sh "
+                    "or set UDLF_CSR_BIN.")
+    return path
+
+
+@pytest.fixture(scope="session")
 def udlf_template(udlf_bin):
     env = os.environ.get("UDLF_CONFIG")
     path = Path(env).expanduser() if env else udlf_bin.parent / "config.ini"

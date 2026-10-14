@@ -162,7 +162,7 @@ def run_platform(config_file: str, bin_path: str):
     return False, output
 
 
-def execute_udlf(config_file: str, bin_path: str, cwd: str = None):
+def execute_udlf(config_file: str, bin_path: str, cwd: str = None, env: dict = None):
     """
     Run the UDLF binary on a config file and diagnose the run.
 
@@ -171,6 +171,7 @@ def execute_udlf(config_file: str, bin_path: str, cwd: str = None):
         bin_path (str): Path to the UDLF binary.
         cwd (str, optional): Working directory of the process (relative
             paths in the config are relative to it). Default: current one.
+        env (dict, optional): environment of the process. Default: inherited.
 
     Returns:
         tuple:
@@ -184,7 +185,7 @@ def execute_udlf(config_file: str, bin_path: str, cwd: str = None):
 
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                              text=True, errors="replace", check=False, cwd=cwd)
+                              text=True, errors="replace", check=False, cwd=cwd, env=env)
     except OSError as e:
         return "", [f"Failed to run UDLF binary {bin_path}: {e}"]
 

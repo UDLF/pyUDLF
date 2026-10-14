@@ -17,6 +17,14 @@ configuration (12 methods, all input/output formats, fusion), on a synthetic dat
 - The UDLF 1.70 reference `config.ini` is shipped with pyUDLF and is the default template of
   `InputType` (the defaults no longer depend on a downloaded file).
 - `pyUDLF.enable_logging(level)`.
+- UDLF-CSR backend: `UDLF(bin_path=..., backend="csr")` runs CPRR and LHRR of
+  [UDLF-CSR](https://github.com/andreTomi/UDLF-CSR) with `engine="dense" | "sparse" | "mkl" |
+  "blas" | "eigen"` and returns the same `Result`, with measures computed with the UDLF
+  definitions (UDLF-CSR's own in `raw_metrics`). `scripts/build_csr.sh` builds it (pinned to
+  commit `b391800`). The binary type is checked: a UDLF binary used as UDLF-CSR (or the
+  opposite) is reported.
+- `UDLF(threads=...)` sets the number of threads of the binary (`OMP_NUM_THREADS`).
+- `Result.warnings`: problems found in the results.
 - In-memory ranked lists as numpy arrays in `InputType.set_input_files`.
 - `pyproject.toml` packaging, `examples/`, and a test suite (`pytest`).
 - Continuous integration (GitHub Actions): Linux with Python 3.9 to 3.13, the built package
@@ -78,7 +86,17 @@ configuration (12 methods, all input/output formats, fusion), on a synthetic dat
 - Defaults of `PARAM_NONE_L`, `PARAM_LHRR_L` and `PARAM_BFSTREE_L`: the `config.ini` inside the
   UDLF 1.70 release has 1000, the one in the UDLF repository (tag v1.70) has 1400. pyUDLF uses
   1400 (the repository value, also the previous `set_method_parameters()` default).
-- UDLF-CSR (sparse backends) is not supported yet.
+- UDLF-CSR (commit `b391800`), to report upstream; pyUDLF detects or works around them:
+  - the `sparse` engines return ranked lists with repeated elements in the top L, which
+    inflates the measures (warning in `Result.warnings`);
+  - the `dense` engines are not deterministic with several threads (use `threads=1`), and
+    their results differ from UDLF's CPRR and LHRR (e.g. Flowers, CPRR MAP 0.6173 vs 0.6382);
+  - `VirtualArray::create` passes a dangling pointer as file name: intermittent "Failed to
+    open backing file" at startup (retried automatically);
+  - its memory-mapped files have fixed names in `/tmp/udlf_temp`, so simultaneous runs could
+    overwrite each other (from the code; not reproduced with small datasets);
+  - it always exits with code 0, reads classes by line order, and leaves variables missing
+    from the config uninitialized (pyUDLF writes them all).
 
 ## 0.8
 

@@ -1,5 +1,7 @@
 # pyUDLF
 
+[![tests](https://github.com/UDLF/pyUDLF/actions/workflows/tests.yml/badge.svg)](https://github.com/UDLF/pyUDLF/actions/workflows/tests.yml)
+
 **Python wrapper for [UDLF](https://github.com/UDLF/UDLF), the Unsupervised Distance Learning Framework.**
 
 [Versão em português](READMEpt.md)
@@ -267,7 +269,9 @@ scripts/build_udlf.sh            # builds UDLF 1.70 from source into .udlf/ (use
 ```
 
 The tests compare every pyUDLF run with UDLF executed directly on the same configuration, using
-the synthetic dataset in `tests/data/synthetic`.
+the synthetic dataset in `tests/data/synthetic`. GitHub Actions runs them on every push and pull
+request (`.github/workflows/tests.yml`): Linux with Python 3.9 to 3.13, the built package, and
+Windows / macOS.
 
 
 ## Applications

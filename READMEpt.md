@@ -1,5 +1,7 @@
 # pyUDLF
 
+[![tests](https://github.com/UDLF/pyUDLF/actions/workflows/tests.yml/badge.svg)](https://github.com/UDLF/pyUDLF/actions/workflows/tests.yml)
+
 **Wrapper Python para o [UDLF](https://github.com/UDLF/UDLF) (Unsupervised Distance Learning Framework).**
 
 [English version](README.md)
@@ -273,7 +275,9 @@ scripts/build_udlf.sh            # builds UDLF 1.70 from source into .udlf/ (use
 ```
 
 Os testes comparam cada execução do pyUDLF com o UDLF executado diretamente com a mesma
-configuração, usando o dataset sintético em `tests/data/synthetic`.
+configuração, usando o dataset sintético em `tests/data/synthetic`. O GitHub Actions os executa a
+cada push e pull request (`.github/workflows/tests.yml`): Linux com Python 3.9 a 3.13, o pacote
+gerado, e Windows / macOS.
 
 
 ## Aplicações

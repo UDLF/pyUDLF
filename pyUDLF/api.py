@@ -22,7 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
-from pyUDLF import csr, install, run_calls
+from pyUDLF import install, run_calls, sparse
 from pyUDLF.errors import UDLFError, UDLFNotFoundError, UDLFParamError, UDLFRunError
 from pyUDLF.utils import evaluation, parser, readData
 from pyUDLF.utils.validations import (METHOD_PARAMS, VALIDATIONS, matches_type,
@@ -43,7 +43,7 @@ _MEASURES = {"MAP": evaluation.compute_map,
 
 class Result:
     """
-    Results of a UDLF (or UDLF-CSR) run.
+    Results of a UDLF (or Sparse UDLF) run.
 
     Attributes:
         method (str): UDLF method.
@@ -57,10 +57,11 @@ class Result:
         stdout (str): everything UDLF printed.
         files (dict): paths of the files of the run, when they were kept.
         warnings (list[str]): problems found in the results (e.g. repeated
-            elements in the ranked lists of UDLF-CSR).
-        raw_metrics (dict): UDLF-CSR runs only: the measures computed by
-            UDLF-CSR itself ("before"/"after"), kept apart because its recall
-            is defined differently; `metrics` follows the UDLF definitions.
+            elements in the ranked lists, or RFE run without connected
+            components by Sparse UDLF).
+        raw_metrics (dict): Sparse UDLF runs only: the measures written in its
+            log ("before"/"after"); `metrics` is computed by pyUDLF with the
+            UDLF definitions, like for UDLF 1.70.
     """
 
     def __init__(self, method, *, ranked_lists=None, matrix=None, metrics=None,
@@ -133,28 +134,41 @@ class UDLF:
 
     Args:
         bin_path (str, optional): path of the UDLF binary. Default: the
-            UDLF_BIN environment variable, then ~/.pyudlf/bin/udlf
-            (backend="csr": the UDLF_CSR_BIN environment variable).
+            UDLF_BIN environment variable, then ~/.pyudlf/bin/udlf.
+            backend="sparse": the directory of the Sparse UDLF binaries (udlf
+            and udlf_strict) or one of them; default: the UDLF_SPARSE_BIN
+            environment variable.
         workdir (str, optional): directory for the files of each run (kept).
             Default: a new temporary directory per run, removed at the end
             unless keep_files=True.
-        backend (str): "udlf" (UDLF, default) or "csr" (UDLF-CSR, which runs
-            CPRR and LHRR with several engines; see pyUDLF.csr).
+        backend (str): "udlf" (UDLF 1.70, default) or "sparse" (Sparse UDLF:
+            sparse CPRR, LHRR, RDPAC, RFE and BFSTREE for large datasets; see
+            pyUDLF.sparse). "csr" is accepted as an alias of "sparse".
         threads (int, optional): number of threads of the binary
-            (OMP_NUM_THREADS). The dense UDLF-CSR engines give slightly
-            different results from run to run with several threads; use
-            threads=1 for reproducible results. Default: inherited.
+            (OMP_NUM_THREADS; with backend="sparse" also the threads of LHRR,
+            unless params sets them). Default: inherited.
     """
 
     def __init__(self, bin_path=None, workdir=None, backend="udlf", threads=None):
         backend = str(backend).strip().lower()
-        if backend not in ("udlf", "csr"):
-            raise UDLFParamError(f"backend must be 'udlf' or 'csr', got {backend!r}.")
+        if backend == "csr":
+            backend = "sparse"
+        if backend not in ("udlf", "sparse"):
+            raise UDLFParamError(f"backend must be 'udlf' or 'sparse', got {backend!r}.")
         self.backend = backend
-        self.bin_path = _find_binary(bin_path, backend)
+        if backend == "sparse":
+            self.binaries = _find_sparse_binaries(bin_path)
+            self.bin_path = next(path for path in self.binaries.values() if path)
+        else:
+            self.binaries = {}
+            self.bin_path = _find_binary(bin_path)
         detected = _detect_backend(self.bin_path)
+        if detected == "csr":
+            raise UDLFParamError(f"{self.bin_path} is the former UDLF-CSR, which pyUDLF no "
+                                 "longer supports: build Sparse UDLF, its successor, with "
+                                 "scripts/build_sparse.sh.")
         if detected is not None and detected != backend:
-            names = {"udlf": "UDLF", "csr": "UDLF-CSR"}
+            names = {"udlf": "UDLF", "sparse": "Sparse UDLF"}
             raise UDLFParamError(f"{self.bin_path} is a {names[detected]} binary, but "
                                  f"backend={backend!r}. Use backend={detected!r}.")
         self.workdir = workdir
@@ -197,8 +211,7 @@ class UDLF:
 
     def run(self, method, *, ranked_lists=None, matrix=None, matrix_type="dist",
             params=None, classes=None, names=None, precisions=None, recalls=None,
-            output="ranked_lists", output_matrix_type="dist", keep_files=False,
-            engine=None):
+            output="ranked_lists", output_matrix_type="dist", keep_files=False):
         """
         Run a UDLF method on one input (UDL task).
 
@@ -211,7 +224,9 @@ class UDLF:
                 path of a matrix file. Use either ranked_lists or matrix.
             matrix_type (str): "dist" or "sim", type of the input matrix.
             params (dict, optional): method parameters by name (see describe());
-                the others keep the default values of the UDLF config.
+                the others keep the default values of the UDLF config. With
+                backend="sparse", also "threads" (LHRR) and "b",
+                "memory_budget_mb" (BFSTREE).
             classes (optional): class label of each element (sequence of N
                 labels), or the path of a UDLF classes file ("name:class" per
                 line, then pass names=). Enables the effectiveness evaluation.
@@ -222,8 +237,6 @@ class UDLF:
             output (str): "ranked_lists" or "matrix".
             output_matrix_type (str): "dist" or "sim", when output="matrix".
             keep_files (bool): keep the files of the run (see Result.files).
-            engine (str, optional): backend="csr" only: "dense" (default),
-                "sparse", "mkl", "blas" or "eigen".
 
         Returns:
             Result
@@ -232,12 +245,9 @@ class UDLF:
             UDLFParamError: invalid method, parameter or input.
             UDLFRunError: UDLF failed.
         """
-        if self.backend == "csr":
-            return self._run_csr(method, engine, ranked_lists, matrix, params, classes,
-                                 names, precisions, recalls, output, output_matrix_type,
-                                 keep_files)
-        if engine is not None:
-            raise UDLFParamError("engine= is only used with backend='csr'.")
+        if self.backend == "sparse":
+            return self._run_sparse(method, ranked_lists, matrix, params, classes, names,
+                                    precisions, recalls, output, keep_files)
         method = _check_method(method)
         if (ranked_lists is None) == (matrix is None):
             raise UDLFParamError("Pass exactly one of ranked_lists= or matrix=.")
@@ -260,8 +270,8 @@ class UDLF:
         Returns:
             Result (FUSION results have metrics only after fusion)
         """
-        if self.backend == "csr":
-            raise UDLFParamError("UDLF-CSR has no FUSION task. Use backend='udlf'.")
+        if self.backend == "sparse":
+            raise UDLFParamError("Sparse UDLF has no FUSION task. Use backend='udlf'.")
         method = _check_method(method)
         if method in _NO_FUSION:
             raise UDLFParamError(f"{method} does not support FUSION in UDLF. Fusion "
@@ -293,8 +303,8 @@ class UDLF:
         input_problems = run_calls.check_input_files(config_path)
         if input_problems:
             raise UDLFParamError("; ".join(input_problems))
-        if self.backend == "csr":
-            return self._run_config_csr(config_path)
+        if self.backend == "sparse":
+            return self._run_config_sparse(config_path)
 
         output, problems = run_calls.execute_udlf(config_path, self.bin_path, env=self._env())
         config_text = Path(config_path).read_text()
@@ -438,36 +448,37 @@ class UDLF:
                       evaluation_data=evaluation_data)
 
 
-    # ------------------------------------------------------------ UDLF-CSR
+    # --------------------------------------------------------- Sparse UDLF
 
-    def _run_csr(self, method, engine, ranked_lists, matrix, params, classes, names,
-                 precisions, recalls, output, output_matrix_type, keep_files):
+    def _run_sparse(self, method, ranked_lists, matrix, params, classes, names, precisions,
+                    recalls, output, keep_files):
         try:
-            base, csr_method = csr.method_name(method, engine)
+            base, sparse_method, binary = sparse.method_name(method)
         except ValueError as e:
             raise UDLFParamError(str(e)) from None
+        binary_path = self._sparse_binary(binary, sparse_method)
         if matrix is not None or ranked_lists is None:
-            raise UDLFParamError("UDLF-CSR reads only ranked lists: pass ranked_lists= "
+            raise UDLFParamError("Sparse UDLF reads only ranked lists: pass ranked_lists= "
                                  "(for matrices use backend='udlf').")
-        if output not in ("ranked_lists", "matrix"):
+        if output == "matrix":
+            raise UDLFParamError(f"Sparse UDLF {sparse.PINNED_COMMIT} writes an all-zero distance "
+                                 "matrix: use output='ranked_lists' (or backend='udlf').")
+        if output != "ranked_lists":
             raise UDLFParamError("output must be 'ranked_lists' or 'matrix'.")
-        if output == "matrix" and str(output_matrix_type).lower() != "dist":
-            raise UDLFParamError("UDLF-CSR writes only distance matrices "
-                                 "(output_matrix_type='dist').")
 
         with _RunDir(self.workdir, keep_files) as (work, kept):
             source = _prepare_ranked_lists(ranked_lists, work / "input.txt")
             if source.rk_format != "NUM":
-                raise UDLFParamError("UDLF-CSR reads only ranked lists of element indices "
+                raise UDLFParamError("Sparse UDLF reads only ranked lists of element indices "
                                      "(not names).")
             n = source.n
-            values = _method_params(base, params)
-            _check_sizes(base, values, n)
-            l, k = int(values[f"PARAM_{base}_L"]), int(values[f"PARAM_{base}_K"])
-            if k > l:
+            values, warnings = self._sparse_params(base, sparse_method, params)
+            udlf_view = sparse.udlf_values(dict(values, UDL_METHOD=sparse_method))
+            _check_sizes(base, udlf_view, n)
+            l, k = udlf_view.get(f"PARAM_{base}_L"), udlf_view.get(f"PARAM_{base}_K")
+            if l is not None and k is not None and int(k) > int(l):
                 raise UDLFParamError(f"k = {k} is larger than l = {l}.")
-            method_values = {name.replace(f"PARAM_{base}_", f"PARAM_{csr_method}_", 1): value
-                             for name, value in values.items()}
+            out_size = run_calls._required_columns(dict(udlf_view, SIZE_DATASET=str(n)))
 
             names_path, names_list = _prepare_names(names, n, work / "lists.txt")
             _, labels = _prepare_classes(classes, names, names_list,
@@ -475,41 +486,30 @@ class UDLF:
             evaluate = labels is not None
             if not evaluate:
                 logger.warning("No classes given: effectiveness evaluation is disabled.")
-            # UDLF-CSR reads the classes by line order, and needs the file anyway
+            # Sparse UDLF loads the classes file even without evaluation
             classes_path = work / "classes.txt"
             classes_path.write_text("".join(
                 f"{name}:{label}\n"
                 for name, label in zip(names_list, labels if evaluate else ["0"] * n)))
             precisions = _measure_depths(precisions, "EFFECTIVENESS_PRECISIONS_TO_COMPUTE",
-                                         l, "precisions")
-            recalls = _measure_depths(recalls, "EFFECTIVENESS_RECALLS_TO_COMPUTE", l,
+                                         out_size, "precisions")
+            recalls = _measure_depths(recalls, "EFFECTIVENESS_RECALLS_TO_COMPUTE", out_size,
                                       "recalls")
 
-            (work / "output").mkdir(exist_ok=True)
-            matrix_path = work / "output_matrix.txt"
+            output_path = work / "output.txt"
             config = {
                 "UDL_TASK": "UDL",
-                "UDL_METHOD": csr_method,
+                "UDL_METHOD": sparse_method,
                 "SIZE_DATASET": n,
                 "INPUT_FILE_FORMAT": "RK",
-                "INPUT_MATRIX_TYPE": "DIST",
                 "INPUT_RK_FORMAT": "NUM",
-                "MATRIX_TO_RK_SORTING": _TEMPLATE["MATRIX_TO_RK_SORTING"],
-                "NUM_INPUT_FUSION_FILES": 0,
                 "INPUT_FILE": source.path,
                 "INPUT_FILE_LIST": names_path,
                 "INPUT_FILE_CLASSES": str(classes_path),
-                "INPUT_IMAGES_PATH": _TEMPLATE["INPUT_IMAGES_PATH"],
                 "OUTPUT_FILE": "TRUE",
                 "OUTPUT_FILE_FORMAT": "RK",
-                "OUTPUT_MATRIX_TYPE": "DIST",
                 "OUTPUT_RK_FORMAT": "NUM",
-                # UDLF-CSR always writes the N x N matrix: discard it unless asked for
-                "OUTPUT_FILE_PATH": str(matrix_path) if output == "matrix" else os.devnull,
-                "OUTPUT_HTML_RK_PER_FILE": _TEMPLATE["OUTPUT_HTML_RK_PER_FILE"],
-                "OUTPUT_HTML_RK_SIZE": _TEMPLATE["OUTPUT_HTML_RK_SIZE"],
-                "OUTPUT_HTML_RK_COLORS": _TEMPLATE["OUTPUT_HTML_RK_COLORS"],
-                "OUTPUT_HTML_RK_BEFORE_AFTER": _TEMPLATE["OUTPUT_HTML_RK_BEFORE_AFTER"],
+                "OUTPUT_FILE_PATH": str(output_path),
                 "OUTPUT_LOG_FILE_PATH": str(work / "log.txt"),
                 "EFFICIENCY_EVAL": "TRUE",
                 "EFFECTIVENESS_EVAL": _bool(evaluate),
@@ -519,8 +519,8 @@ class UDLF:
                 "EFFECTIVENESS_RECALLS_TO_COMPUTE": ",".join(map(str, recalls or [1])),
                 "EFFECTIVENESS_PRECISIONS_TO_COMPUTE": ",".join(map(str, precisions or [1])),
             }
-            config.update(method_values)
-            config_text = csr.config_text(config)
+            config.update(values)
+            config_text = sparse.config_text(config)
             config_path = work / "config.ini"
             config_path.write_text(config_text)
 
@@ -528,23 +528,25 @@ class UDLF:
             if input_problems:
                 raise UDLFParamError("; ".join(input_problems))
 
-            stdout, problems, retries = self._execute_csr(str(config_path), cwd=str(work))
-            output_path = work / "output" / "reranked_lists.txt"
+            # The scratch files of the binary go to the run directory, so that
+            # simultaneous runs do not share them
+            stdout, problems = self._execute_sparse(binary_path, str(config_path), str(work),
+                                                    scratch=work / "scratch")
             if not problems and not output_path.is_file():
-                problems.append("UDLF-CSR did not write the ranked lists")
+                problems.append("Sparse UDLF did not write the ranked lists")
             if problems:
                 raise UDLFRunError(problems, stdout, config_text)
 
-            top = np.ascontiguousarray(_read_top_array(output_path, l))
-            warnings = retries + _repeated_elements_warning(top)
-            matrix_out = _read_matrix(matrix_path, n, np.float64) if output == "matrix" else None
-            raw = csr.parse_log((work / "log.txt").read_text()) \
+            top = np.ascontiguousarray(_read_top_array(output_path, None))
+            warnings += _repeated_elements_warning(top)
+            raw = sparse.parse_log((work / "log.txt").read_text()) \
                 if evaluate and (work / "log.txt").is_file() else {}
 
             metrics, evaluation_data = {}, None
             if evaluate:
-                before = source.ranked_lists(l, names_list)
-                metrics = _python_metrics(before, top, labels, l, precisions, recalls)
+                depth = top.shape[1]
+                before = source.ranked_lists(depth, names_list)
+                metrics = _python_metrics(before, top, labels, depth, precisions, recalls)
 
                 def evaluation_data(before=before, after=top):
                     return before, after, labels
@@ -554,89 +556,135 @@ class UDLF:
                 files = {"config": str(config_path), "log": str(work / "log.txt"),
                          "lists": names_path, "classes": str(classes_path),
                          "output": str(output_path)}
-                if output == "matrix":
-                    files["matrix"] = str(matrix_path)
-            return Result(csr_method, ranked_lists=None if output == "matrix" else top,
-                          matrix=matrix_out, metrics=metrics, time=csr.parse_time(stdout),
-                          config=config_text, stdout=stdout, files=files,
-                          evaluation_data=evaluation_data, warnings=warnings,
+            return Result(sparse_method, ranked_lists=top, metrics=metrics,
+                          time=sparse.parse_time(stdout), config=config_text, stdout=stdout,
+                          files=files, evaluation_data=evaluation_data, warnings=warnings,
                           raw_metrics=raw)
 
-    def _execute_csr(self, config_path, cwd=None, attempts=csr.RUN_ATTEMPTS):
-        """Run UDLF-CSR; repeat runs that fail with its intermittent startup
-        error (before any computation), recording it as a warning."""
-        warnings = []
-        for attempt in range(1, attempts + 1):
-            stdout, problems = run_calls.execute_udlf(config_path, self.bin_path, cwd=cwd,
-                                                      env=self._env())
-            problems += csr.check_output(stdout)
-            if attempt == attempts or not any(csr.TRANSIENT_ERROR in p for p in problems):
-                return stdout, problems, warnings
-            message = (f"UDLF-CSR failed with '{csr.TRANSIENT_ERROR}' (an intermittent "
-                       f"UDLF-CSR bug, before any computation) and was run again.")
-            logger.warning(message)
-            warnings.append(message)
+    def _sparse_binary(self, binary, sparse_method):
+        """Path of the Sparse UDLF binary that runs a method."""
+        path = self.binaries.get(binary)
+        if path is None and binary == sparse.FAST_BINARY:
+            path = self.binaries.get(sparse.STRICT_BINARY)   # it runs every method
+        if path is None:
+            raise UDLFNotFoundError(
+                f"{sparse_method} runs only in the strict Sparse UDLF binary "
+                f"({sparse.STRICT_BINARY}), not found next to {self.bin_path}. Build both "
+                "binaries with scripts/build_sparse.sh.")
+        return path
 
-    def _run_config_csr(self, config_path):
-        """run_config() for UDLF-CSR: it writes the ranked lists to
-        output/reranked_lists.txt in the current directory."""
+    def _sparse_params(self, base, sparse_method, params):
+        """Parameter values for Sparse UDLF (UDLF 1.70 defaults, validated by the
+        UDLF schema, plus the parameters only Sparse UDLF has), and warnings."""
+        extra_specs = sparse.EXTRA_PARAMS.get(base, {})
+        given = {str(key).lower(): value for key, value in (params or {}).items()}
+        extra = {}
+        for short, (name, default, kind) in extra_specs.items():
+            value = given.pop(short, None)
+            if value is None and short == "threads" and self.threads is not None:
+                value = self.threads
+            if value is None:
+                value = default
+            if not matches_type(value, kind) or value < 1:
+                raise UDLFParamError(f"Parameter {short!r} of {sparse_method} must be a "
+                                     f"positive {kind.__name__}, got {value!r}.")
+            extra[name] = value
+
+        values = _method_params(base, given)
+        warnings = []
+        for name, required in sparse.NOT_PORTED.items():
+            if name not in values:
+                continue
+            short = name[len(f"PARAM_{base}_"):].lower()
+            if short in given and (required is None or values[name] != required):
+                raise UDLFParamError(f"{short} is not supported by Sparse UDLF "
+                                     f"{sparse.PINNED_COMMIT}.")
+            del values[name]
+        if sparse.RFE_CCS in values:
+            if "perform_ccs" in given and values[sparse.RFE_CCS] == "TRUE":
+                raise UDLFParamError(f"perform_ccs=True is not supported by Sparse UDLF "
+                                     f"{sparse.PINNED_COMMIT} (work in progress there).")
+            if "perform_ccs" not in given:
+                message = (f"RFE runs with perform_ccs=False: Sparse UDLF "
+                           f"{sparse.PINNED_COMMIT} does not support connected components yet "
+                           "(UDLF 1.70 uses perform_ccs=True by default).")
+                logger.warning(message)
+                warnings.append(message)
+            values[sparse.RFE_CCS] = "FALSE"
+
+        prefix = f"PARAM_{base}_"
+        renamed = {f"PARAM_{sparse_method}_" + name[len(prefix):]: value
+                   for name, value in values.items()}
+        renamed.update({name: _format_value(value) for name, value in extra.items()})
+        return renamed, warnings
+
+    def _execute_sparse(self, binary_path, config_path, cwd, scratch=None):
+        env = dict(self._env() or os.environ)
+        if scratch is not None:
+            env["UDLF_TMPDIR"] = str(scratch)
+        stdout, problems = run_calls.execute_udlf(config_path, binary_path, cwd=cwd, env=env)
+        problems = [p.replace("UDLF exited", "Sparse UDLF exited") for p in problems]
+        return stdout, problems + sparse.check_output(stdout)
+
+    def _run_config_sparse(self, config_path):
+        """run_config() for Sparse UDLF: picks the binary from UDL_METHOD."""
         values = parser.read_config_values(config_path)
         method = values.get("UDL_METHOD", "")
-        out_dir = Path.cwd() / "output"
-        if not out_dir.is_dir():
-            out_dir.mkdir()
-            logger.info("Created %s (UDLF-CSR writes its ranked lists there)", out_dir)
-
-        stdout, problems, retries = self._execute_csr(config_path)
-        output_path = out_dir / "reranked_lists.txt"
+        try:
+            _, sparse_method, binary = sparse.method_name(method)
+        except ValueError as e:
+            raise UDLFParamError(str(e)) from None
+        stdout, problems = self._execute_sparse(self._sparse_binary(binary, sparse_method),
+                                                config_path, os.getcwd())
         config_text = Path(config_path).read_text()
-        if not problems and not output_path.is_file():
-            problems.append("UDLF-CSR did not write the ranked lists")
         if problems:
             raise UDLFRunError(problems, stdout, config_text)
 
+        warnings = []
         n = int(values.get("SIZE_DATASET", 0))
-        l = int(values.get(f"PARAM_{method}_L", 0)) or None
-        top = np.ascontiguousarray(_read_top_array(output_path, l))
-        warnings = retries + _repeated_elements_warning(top)
-        matrix_file = values.get("OUTPUT_FILE_PATH", "")
-        matrix = None
-        if matrix_file and matrix_file != os.devnull and os.path.isfile(matrix_file):
-            matrix = _read_matrix(matrix_file, n, np.float64)
+        out_file = values.get("OUTPUT_FILE_PATH", "")
+        out_format = values.get("OUTPUT_FILE_FORMAT", "RK")
+        top = matrix = None
+        if values.get("OUTPUT_FILE", "TRUE") == "TRUE" and out_file and os.path.isfile(out_file):
+            if out_format == "MATRIX":
+                matrix = _read_matrix(out_file, n, np.float64)
+                if not matrix.any():
+                    warnings.append(f"The matrix written by Sparse UDLF {sparse.PINNED_COMMIT} "
+                                    "is all zeros (a bug of that version).")
+            else:
+                top = np.ascontiguousarray(_read_top_array(out_file, None))
+                warnings += _repeated_elements_warning(top)
         log_path = values.get("OUTPUT_LOG_FILE_PATH", "")
-        raw = csr.parse_log(Path(log_path).read_text()) if log_path and \
+        raw = sparse.parse_log(Path(log_path).read_text()) if log_path and \
             os.path.isfile(log_path) else {}
 
         metrics, evaluation_data = {}, None
         list_path, classes_path = values.get("INPUT_FILE_LIST"), values.get("INPUT_FILE_CLASSES")
-        if (values.get("EFFECTIVENESS_EVAL") == "TRUE" and list_path and classes_path
-                and os.path.isfile(list_path) and os.path.isfile(classes_path)):
+        if (top is not None and values.get("EFFECTIVENESS_EVAL", "TRUE") == "TRUE"
+                and list_path and classes_path and os.path.isfile(list_path)
+                and os.path.isfile(classes_path)):
             names_list = Path(list_path).read_text().split()
             labels = readData.classes_of(names_list, classes_path)
-            in_file_order = [t.partition(":")[0] for t in Path(classes_path).read_text().split()]
-            if in_file_order[:len(names_list)] != names_list:
-                warnings.append("The classes file is not in the order of the lists file: "
-                                "UDLF-CSR reads the classes by line order, so its own "
-                                "measures (raw_metrics) are wrong. `metrics` matches classes "
-                                "by name.")
             depth = top.shape[1]
             before = np.array(_read_top(values["INPUT_FILE"], depth), dtype=np.int64)
-            precisions = [k for k in _int_list(values.get("EFFECTIVENESS_PRECISIONS_TO_COMPUTE"))
-                          if k <= depth]
-            recalls = [k for k in _int_list(values.get("EFFECTIVENESS_RECALLS_TO_COMPUTE"))
-                       if k <= depth]
+            precisions = [k for k in _int_list(values.get("EFFECTIVENESS_PRECISIONS_TO_COMPUTE",
+                                                          "4,5,10,15,20,30,50,100")) if k <= depth]
+            recalls = [k for k in _int_list(values.get("EFFECTIVENESS_RECALLS_TO_COMPUTE",
+                                                       "4,5,10,20,40")) if k <= depth]
             metrics = _python_metrics(before, top, labels, depth, precisions, recalls)
 
             def evaluation_data(before=before, after=top):
                 return before, after, labels
 
-        files = {"config": config_path, "ranked_lists": str(output_path)}
+        files = {"config": config_path}
+        if top is not None:
+            files["ranked_lists"] = out_file
+        if matrix is not None:
+            files["matrix"] = out_file
         if log_path:
             files["log"] = log_path
-        if matrix is not None:
-            files["matrix"] = matrix_file
-        return Result(method, ranked_lists=top, matrix=matrix, metrics=metrics,
-                      time=csr.parse_time(stdout), config=config_text, stdout=stdout,
+        return Result(sparse_method, ranked_lists=top, matrix=matrix, metrics=metrics,
+                      time=sparse.parse_time(stdout), config=config_text, stdout=stdout,
                       files=files, evaluation_data=evaluation_data, warnings=warnings,
                       raw_metrics=raw)
 
@@ -701,16 +749,9 @@ class _Source:
         return np.array(rows, dtype=np.int64)
 
 
-def _find_binary(bin_path, backend="udlf"):
+def _find_binary(bin_path):
     if bin_path is not None:
         path, origin = os.path.expanduser(str(bin_path)), "bin_path"
-    elif backend == "csr":
-        if not os.environ.get("UDLF_CSR_BIN"):
-            raise UDLFNotFoundError(
-                "UDLF-CSR has no official build: build it (scripts/build_csr.sh in the "
-                "pyUDLF repository, or `make` in https://github.com/andreTomi/UDLF-CSR) and "
-                "pass bin_path= or set the UDLF_CSR_BIN environment variable.")
-        path, origin = os.path.expanduser(os.environ["UDLF_CSR_BIN"]), "UDLF_CSR_BIN"
     elif os.environ.get("UDLF_BIN"):
         path, origin = os.path.expanduser(os.environ["UDLF_BIN"]), "UDLF_BIN"
     else:
@@ -719,16 +760,44 @@ def _find_binary(bin_path, backend="udlf"):
         hint = ("Install the official release with `pyudlf download` (or "
                 "pyUDLF.install.download_udlf()), or " + install.BUILD_HINT[0].lower()
                 + install.BUILD_HINT[1:]) if origin == "default location" else install.BUILD_HINT
-        if backend == "csr":
-            hint = "Build UDLF-CSR with scripts/build_csr.sh."
         raise UDLFNotFoundError(f"UDLF binary not found at {path} ({origin}). {hint}")
-    # absolute: UDLF-CSR runs in the run directory (its output path is relative to it)
     return os.path.abspath(path)
 
 
+def _find_sparse_binaries(bin_path):
+    """{binary name: absolute path or None} of the Sparse UDLF binaries, from
+    their directory or one of them (bin_path, then UDLF_SPARSE_BIN)."""
+    origin = "bin_path"
+    if bin_path is None:
+        bin_path = os.environ.get("UDLF_SPARSE_BIN") or os.environ.get("UDLF_CSR_BIN")
+        origin = "UDLF_SPARSE_BIN"
+    if not bin_path:
+        raise UDLFNotFoundError(
+            "Sparse UDLF has no official build: build it (scripts/build_sparse.sh in the "
+            "pyUDLF repository, or `make udlf udlf-strict` in "
+            "https://github.com/andreTomi/Sparse_UDLF) and pass bin_path= (the directory "
+            "of its binaries) or set the UDLF_SPARSE_BIN environment variable.")
+    path = os.path.abspath(os.path.expanduser(str(bin_path)))
+    if os.path.isfile(path):
+        given, directory = os.path.basename(path), os.path.dirname(path)
+        binaries = {name: os.path.join(directory, name) for name in
+                    (sparse.FAST_BINARY, sparse.STRICT_BINARY)}
+        if given not in binaries:
+            binaries = {sparse.FAST_BINARY: path, sparse.STRICT_BINARY: None}
+    else:
+        binaries = {name: os.path.join(path, name) for name in
+                    (sparse.FAST_BINARY, sparse.STRICT_BINARY)}
+    binaries = {name: p if p and os.path.isfile(p) else None for name, p in binaries.items()}
+    if not any(binaries.values()):
+        raise UDLFNotFoundError(f"Sparse UDLF binaries ({sparse.FAST_BINARY}, "
+                                f"{sparse.STRICT_BINARY}) not found at {path} ({origin}). "
+                                "Build them with scripts/build_sparse.sh.")
+    return binaries
+
+
 def _detect_backend(bin_path):
-    """'udlf' or 'csr' from the binary's answer to a missing config (None if
-    unknown). Both programs exit right away in that case."""
+    """'udlf', 'sparse' or 'csr' (the former UDLF-CSR) from the binary's answer
+    to a missing config (None if unknown). They all exit right away then."""
     with tempfile.TemporaryDirectory(prefix="pyudlf_probe_") as tmp:
         try:
             proc = subprocess.run([bin_path, os.path.join(tmp, "missing.ini")],
@@ -739,7 +808,8 @@ def _detect_backend(bin_path):
     if "Configuration file not found" in proc.stdout:
         return "udlf"
     if "Failed to open file" in proc.stdout:
-        return "csr"
+        # UDLF-CSR exited with code 0 on every error; Sparse UDLF exits with 1
+        return "sparse" if proc.returncode != 0 else "csr"
     return None
 
 
@@ -968,12 +1038,9 @@ def _repeated_elements_warning(rks):
     rows = int((ordered[:, 1:] == ordered[:, :-1]).any(axis=1).sum())
     if not rows:
         return []
-    message = (f"{rows} of {len(rks)} ranked lists returned by UDLF-CSR contain repeated "
-               f"elements in their top {rks.shape[1]}; each repetition is counted by the "
-               "evaluation, so the measures may be inflated. This happens when l is larger "
-               "than the number of elements the engine scores for a query (those reachable "
-               "from its k nearest neighbors): only that many positions are rewritten and the "
-               "rest keep the previous ranking. A larger k or a smaller l avoids it.")
+    message = (f"{rows} of {len(rks)} ranked lists contain repeated elements in their top "
+               f"{rks.shape[1]}; each repetition is counted by the evaluation, so the "
+               "measures may be inflated.")
     logger.warning(message)
     return [message]
 

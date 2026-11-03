@@ -36,8 +36,8 @@ def expected_outputs(code):
     return [m.group(1).strip() for line in code.splitlines() if (m := EXPECTED.match(line))]
 
 
-CSR_BIN = Path(os.environ.get("UDLF_CSR_BIN") or
-               REPO / ".udlf" / "UDLF-CSR" / "Source" / "bin" / "udlf")
+SPARSE_BIN = Path(os.environ.get("UDLF_SPARSE_BIN") or REPO / ".udlf" / "Sparse_UDLF" / "bin")
+SPARSE_BUILT = (SPARSE_BIN / "udlf_strict").is_file() or SPARSE_BIN.is_file()
 
 
 @pytest.fixture(autouse=True)
@@ -45,8 +45,8 @@ def binary(udlf_bin, monkeypatch):
     from pyUDLF import run_calls
     monkeypatch.setenv("UDLF_BIN", str(udlf_bin))
     monkeypatch.setattr(run_calls, "bin_path", str(udlf_bin))
-    if CSR_BIN.is_file():
-        monkeypatch.setenv("UDLF_CSR_BIN", str(CSR_BIN))
+    if SPARSE_BUILT:
+        monkeypatch.setenv("UDLF_SPARSE_BIN", str(SPARSE_BIN))
 
 
 def test_quickstart_example_prints_what_it_says(tmp_path):
@@ -91,13 +91,13 @@ def test_readme_examples_run_and_print_what_they_say(readme, tmp_path, monkeypat
         exec(compile(blocks[0], f"{readme} (quickstart)", "exec"), namespace)
         _write_dataset_files(namespace, tmp_path)
         for i, code in enumerate(blocks[1:], 1):
-            if 'backend="csr"' in code and not CSR_BIN.is_file():
-                continue  # UDLF-CSR is not built (e.g. Windows / macOS)
+            if 'backend="sparse"' in code and not SPARSE_BUILT:
+                continue  # Sparse UDLF is not built (e.g. Windows / macOS)
             exec(compile(code, f"{readme} (block {i})", "exec"), namespace)
 
     printed = output.getvalue()
     for code in blocks:
-        if 'backend="csr"' in code and not CSR_BIN.is_file():
+        if 'backend="sparse"' in code and not SPARSE_BUILT:
             continue
         for expected in expected_outputs(code):
             assert expected in printed, f"{readme}: expected {expected!r}"

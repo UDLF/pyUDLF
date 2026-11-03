@@ -20,7 +20,7 @@ The test suite runs every script (`tests/test_examples.py`), so they stay in syn
 | [fusion.py](fusion.py) | Fusion of the ranked lists of two descriptors (`udlf.fuse`). |
 | [per_query_analysis.py](per_query_analysis.py) | Which queries improved or got worse, how their top 10 changed, and saving the re-ranked lists. |
 | [your_own_data.py](your_own_data.py) | Command line for your own files: ranked lists, a matrix or features (`.npy`), with classes. |
-| [csr_engines.py](csr_engines.py) | UDLF compared with the engines of UDLF-CSR (needs a UDLF-CSR build: `scripts/build_csr.sh`). |
+| [sparse_methods.py](sparse_methods.py) | UDLF 1.70 compared with Sparse UDLF, method by method (needs a Sparse UDLF build: `scripts/build_sparse.sh`). |
 | [legacy_api.py](legacy_api.py) | The API of previous versions (`InputType` + `run_calls`), still supported. |
 
 ## Your own data

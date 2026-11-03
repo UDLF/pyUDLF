@@ -3,7 +3,7 @@ import re
 import tempfile
 from pathlib import Path
 import subprocess
-from pyUDLF import install
+from pyUDLF import install, sparse
 from pyUDLF.errors import UDLFError
 from pyUDLF.utils import readData, outputType, evaluation, parser
 import sys
@@ -415,7 +415,8 @@ def check_input_files(config_file: str) -> list:
     Returns:
         list[str]: description of each problem found; empty if inputs are OK.
     """
-    values = parser.read_config_values(config_file)
+    # Sparse UDLF names (CPRR_SPARSE, PARAM_CPRR_SPARSE_L) read like UDLF ones
+    values = sparse.udlf_values(parser.read_config_values(config_file))
     if values.get("INPUT_FILE_FORMAT", "AUTO") not in ("RK", "AUTO"):
         return []
     try:

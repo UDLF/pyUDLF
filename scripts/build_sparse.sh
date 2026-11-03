@@ -11,9 +11,13 @@
 #                refuse to run in the fast-math binary).
 # pyUDLF picks the right one for each method.
 #
-# Needs g++ with C++23 and OpenMP, TBB (libtbb-dev) and jemalloc. Without the
-# jemalloc development package (libjemalloc-dev) the binaries are linked
-# against the runtime library (libjemalloc.so.2) directly.
+# Needs a C++ compiler with OpenMP (g++; CXX selects another one), TBB and
+# jemalloc. Without the jemalloc development package (libjemalloc-dev) the
+# binaries are linked against the runtime library (libjemalloc.so.2) directly.
+# In an active conda environment (e.g. Miniforge, no root needed:
+#   conda create -n udlf -c conda-forge python=3.12 gxx_linux-64 tbb-devel jemalloc make)
+# its compiler ($CXX) and libraries are used. A compiler without C++23 (g++ < 11)
+# builds with -std=gnu++17, which the sources support.
 set -euo pipefail
 
 DEST_DIR="${1:-.udlf}"
@@ -30,14 +34,31 @@ git -C Sparse_UDLF fetch --quiet origin
 git -C Sparse_UDLF -c advice.detachedHead=false checkout --quiet --force "$COMMIT"
 cd Sparse_UDLF
 
-MAKE_ARGS=()
-if ! echo 'int main(){}' | g++ -x c++ - -o /dev/null -ljemalloc 2>/dev/null; then
-    JEMALLOC=$(ldconfig -p 2>/dev/null | grep -o '/[^ ]*libjemalloc\.so\.2$' | head -n 1 || true)
-    if [ -z "$JEMALLOC" ]; then
-        echo "jemalloc not found: install it (Debian/Ubuntu: sudo apt install libjemalloc-dev)" >&2
+CXX="${CXX:-g++}"
+LIB_FLAGS=""
+if [ -n "${CONDA_PREFIX:-}" ]; then
+    LIB_FLAGS="-L$CONDA_PREFIX/lib -Wl,-rpath,$CONDA_PREFIX/lib"
+fi
+links() {
+    # shellcheck disable=SC2086
+    echo 'int main(){}' | "$CXX" -x c++ - -o /dev/null $LIB_FLAGS "$@" 2>/dev/null
+}
+
+JEMALLOC="-ljemalloc"
+if ! links -ljemalloc; then
+    LIB=$( (ls "${CONDA_PREFIX:-/nonexistent}"/lib/libjemalloc.so.2 2>/dev/null;
+            ldconfig -p 2>/dev/null | grep -o '/[^ ]*libjemalloc\.so\.2$') | head -n 1 || true)
+    if [ -z "$LIB" ]; then
+        echo "jemalloc not found: install it (Debian/Ubuntu: sudo apt install libjemalloc-dev;" \
+             "without root: conda install -c conda-forge jemalloc)" >&2
         exit 1
     fi
-    MAKE_ARGS+=("LDFLAGS=-lm -lpthread -ltbb -l:$(basename "$JEMALLOC") -lgomp")
+    JEMALLOC="-l:$(basename "$LIB")"
+fi
+MAKE_ARGS=("CC=$CXX" "LDFLAGS=$LIB_FLAGS -lm -lpthread -ltbb $JEMALLOC -lgomp")
+if ! echo 'int main(){}' | "$CXX" -std=gnu++23 -x c++ -fsyntax-only - 2>/dev/null; then
+    echo "note: $CXX does not support C++23; building with -std=gnu++17" >&2
+    MAKE_ARGS+=("BASE_FLAGS=-std=gnu++17 -O3 -g -fno-omit-frame-pointer -D_GNU_SOURCE")
 fi
 
 make -j"$(nproc 2>/dev/null || echo 2)" udlf udlf-strict "${MAKE_ARGS[@]}" >/dev/null

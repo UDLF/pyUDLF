@@ -24,7 +24,9 @@ configuration (12 methods, all input/output formats, fusion), on a synthetic dat
   are byte-identical to UDLF 1.70. `bin_path` (or `UDLF_SPARSE_BIN`) is the directory of its two
   binaries; each method runs in the one that supports it. Its extra parameters are `threads`
   (LHRR) and `b`, `memory_budget_mb` (BFSTREE). `scripts/build_sparse.sh` builds it (pinned to
-  commit `de3c14c`). The binary type is checked: a UDLF binary used as Sparse UDLF (or the
+  commit `de3c14c`), also without root: it uses the compiler and libraries of an active conda
+  environment (`CXX`, `CONDA_PREFIX`), and builds with `-std=gnu++17` when the compiler has no
+  C++23 (g++ < 11). The binary type is checked: a UDLF binary used as Sparse UDLF (or the
   opposite), or a binary of its predecessor UDLF-CSR, is reported. `backend="csr"` and
   `UDLF_CSR_BIN` are aliases.
 - `UDLF(threads=...)` sets the number of threads of the binary (`OMP_NUM_THREADS`).

@@ -1,0 +1,345 @@
+"""
+Validation rules for UDLF config parameters.
+Generated from config.ini specification.
+"""
+
+from pyUDLF.utils.logger import get_logger
+from numbers import Integral
+from pathlib import Path
+
+import numpy as np
+
+logger = get_logger(__name__)
+
+VALIDATIONS = {
+    # ========================
+    # GENERAL CONFIGURATION
+    # ========================
+    "UDL_TASK": {"type": "enum", "values": {"UDL", "FUSION"}},
+    "UDL_METHOD": {"type": "enum", "values": {
+        "NONE", "CPRR", "RLRECOM", "RLSIM", "CONTEXTRR",
+        "RECKNNGRAPH", "RKGRAPH", "CORGRAPH", "LHRR",
+        "BFSTREE", "RDPAC", "RFE"
+    }},
+
+    # ========================
+    # INPUT DATASET FILES
+    # ========================
+    "SIZE_DATASET": {"type": "uint"},
+    "INPUT_FILE_FORMAT": {"type": "enum", "values": {"AUTO", "MATRIX", "RK"}},
+    "INPUT_MATRIX_TYPE": {"type": "enum", "values": {"DIST", "SIM"}},
+    "INPUT_RK_FORMAT": {"type": "enum", "values": {"NUM", "STR"}},
+    "MATRIX_TO_RK_SORTING": {"type": "enum", "values": {"HEAP", "INSERTION"}},
+    "NUM_INPUT_FUSION_FILES": {"type": "uint"},
+    # Paths: INPUT_FILES_FUSION_*, INPUT_FILE, INPUT_FILE_LIST, INPUT_FILE_CLASSES, INPUT_IMAGES_PATH
+    # These can be any string, so we won't restrict.
+
+    # ========================
+    # OUTPUT FILES SETTINGS
+    # ========================
+    "OUTPUT_FILE": {"type": "bool"},
+    "OUTPUT_FILE_FORMAT": {"type": "enum", "values": {"RK", "MATRIX"}},
+    "OUTPUT_MATRIX_TYPE": {"type": "enum", "values": {"DIST", "SIM"}},
+    "OUTPUT_RK_FORMAT": {"type": "enum", "values": {"NUM", "STR", "HTML", "ALL"}},
+    "OUTPUT_HTML_RK_PER_FILE": {"type": "uint"},
+    "OUTPUT_HTML_RK_SIZE": {"type": "uint"},
+    "OUTPUT_HTML_RK_COLORS": {"type": "bool"},
+    "OUTPUT_HTML_RK_BEFORE_AFTER": {"type": "bool"},
+    # Paths: OUTPUT_FILE_PATH, OUTPUT_LOG_FILE_PATH → free strings
+
+    # ========================
+    # EVALUATION SETTINGS
+    # ========================
+    "EFFICIENCY_EVAL": {"type": "bool"},
+    "EFFECTIVENESS_EVAL": {"type": "bool"},
+    "EFFECTIVENESS_COMPUTE_PRECISIONS": {"type": "bool"},
+    "EFFECTIVENESS_COMPUTE_MAP": {"type": "bool"},
+    "EFFECTIVENESS_COMPUTE_RECALL": {"type": "bool"},
+    "EFFECTIVENESS_RECALLS_TO_COMPUTE": {"type": "list_uint"},
+    "EFFECTIVENESS_PRECISIONS_TO_COMPUTE": {"type": "list_uint"},
+
+    # ========================
+    # METHOD PARAMETERS
+    # ========================
+    # NONE
+    "PARAM_NONE_L": {"type": "uint"},
+
+    # CONTEXTRR
+    "PARAM_CONTEXTRR_L": {"type": "uint"},
+    "PARAM_CONTEXTRR_K": {"type": "uint"},
+    "PARAM_CONTEXTRR_T": {"type": "uint"},
+    "PARAM_CONTEXTRR_NBYK": {"type": "uint"},
+    "PARAM_CONTEXTRR_OPTIMIZATIONS": {"type": "bool"},
+
+    # CORGRAPH
+    "PARAM_CORGRAPH_L": {"type": "uint"},
+    "PARAM_CORGRAPH_K": {"type": "uint"},
+    "PARAM_CORGRAPH_THRESHOLD_START": {"type": "float", "min": 0, "max": 1},
+    "PARAM_CORGRAPH_THRESHOLD_END": {"type": "float", "min": 0, "max": 1},
+    "PARAM_CORGRAPH_THRESHOLD_INC": {"type": "float", "min": 0.0},
+    "PARAM_CORGRAPH_CORRELATION": {"type": "enum", "values": {"PEARSON", "RBO"}},
+
+    # CPRR
+    "PARAM_CPRR_L": {"type": "uint"},
+    "PARAM_CPRR_K": {"type": "uint"},
+    "PARAM_CPRR_T": {"type": "uint"},
+
+    # RKGRAPH
+    "PARAM_RKGRAPH_K": {"type": "uint"},
+    "PARAM_RKGRAPH_T": {"type": "uint"},
+    "PARAM_RKGRAPH_P": {"type": "float", "min": 0, "max": 1},
+    "PARAM_RKGRAPH_L": {"type": "uint"},
+
+    # RECKNNGRAPH
+    "PARAM_RECKNNGRAPH_L": {"type": "uint"},
+    "PARAM_RECKNNGRAPH_K": {"type": "uint"},
+    "PARAM_RECKNNGRAPH_EPSILON": {"type": "float", "min": 0},
+
+    # RLRECOM
+    "PARAM_RLRECOM_L": {"type": "uint"},
+    "PARAM_RLRECOM_K": {"type": "uint"},
+    "PARAM_RLRECOM_LAMBDA": {"type": "float", "min": 0},
+    "PARAM_RLRECOM_EPSILON": {"type": "float", "min": 0},
+
+    # RLSIM
+    "PARAM_RLSIM_TOPK": {"type": "uint"},
+    "PARAM_RLSIM_CK": {"type": "uint"},
+    "PARAM_RLSIM_T": {"type": "uint"},
+    "PARAM_RLSIM_METRIC": {"type": "enum", "values": {
+        "INTERSECTION", "RBO", "KENDALL_TAU", "SPEARMAN",
+        "GOODMAN", "JACCARD", "JACCARD_K", "KENDALL_TAU_W"
+    }},
+
+    # LHRR
+    "PARAM_LHRR_K": {"type": "uint"},
+    "PARAM_LHRR_L": {"type": "uint"},
+    "PARAM_LHRR_T": {"type": "uint"},
+
+    # BFSTREE
+    "PARAM_BFSTREE_L": {"type": "uint"},
+    "PARAM_BFSTREE_K": {"type": "uint"},
+    "PARAM_BFSTREE_CORRELATION_METRIC": {"type": "enum", "values": {"RBO"}},
+
+    # RDPAC
+    "PARAM_RDPAC_K_END": {"type": "uint"},
+    "PARAM_RDPAC_K_INC": {"type": "uint"},
+    "PARAM_RDPAC_K_START": {"type": "uint"},
+    "PARAM_RDPAC_L": {"type": "uint"},
+    "PARAM_RDPAC_L_MULT": {"type": "float", "min": 0},
+    "PARAM_RDPAC_P": {"type": "float", "min": 0, "max": 1},
+    "PARAM_RDPAC_PL": {"type": "float", "min": 0, "max": 1},
+
+    # RFE
+    "PARAM_RFE_K": {"type": "uint"},
+    "PARAM_RFE_T": {"type": "uint"},
+    "PARAM_RFE_L": {"type": "uint"},
+    "PARAM_RFE_PA": {"type": "float", "min": 0, "max": 1},
+    "PARAM_RFE_TH_CC": {"type": "float"},
+    "PARAM_RFE_RERANK_BY_EMB": {"type": "bool"},
+    "PARAM_RFE_EXPORT_EMBEDDINGS": {"type": "bool"},
+    "PARAM_RFE_PERFORM_CCS": {"type": "bool"},
+    # Paths: PARAM_RFE_EMBEDDINGS_PATH, PARAM_RFE_CCS_PATH → free strings
+}
+
+# parameters map for each method
+METHOD_PARAMS = {
+    "NONE": {
+        "l": {"param": "PARAM_NONE_L", "default": 1400, "type": int},
+    },
+    "CONTEXTRR": {
+        "l":   {"param": "PARAM_CONTEXTRR_L", "default": 25, "type": int},
+        "k":   {"param": "PARAM_CONTEXTRR_K", "default": 7, "type": int},
+        "t":   {"param": "PARAM_CONTEXTRR_T", "default": 5, "type": int},
+        "nbyk": {"param": "PARAM_CONTEXTRR_NBYK", "default": 1, "type": int},
+        "optimizations": {"param": "PARAM_CONTEXTRR_OPTIMIZATIONS", "default": True, "type": bool},
+    },
+    "CORGRAPH": {
+        "l":   {"param": "PARAM_CORGRAPH_L", "default": 200, "type": int},
+        "k":   {"param": "PARAM_CORGRAPH_K", "default": 25, "type": int},
+        "threshold_start": {"param": "PARAM_CORGRAPH_THRESHOLD_START", "default": 0.35, "type": float},
+        "threshold_end": {"param": "PARAM_CORGRAPH_THRESHOLD_END", "default": 1.0, "type": float},
+        "threshold_inc": {"param": "PARAM_CORGRAPH_THRESHOLD_INC", "default": 0.005, "type": float},
+        "correlation": {"param": "PARAM_CORGRAPH_CORRELATION", "default": "PEARSON", "type": str},
+    },
+    "CPRR": {
+        "l": {"param": "PARAM_CPRR_L", "default": 400, "type": int},
+        "k": {"param": "PARAM_CPRR_K", "default": 20, "type": int},
+        "t": {"param": "PARAM_CPRR_T", "default": 2, "type": int},
+    },
+    "RKGRAPH": {
+        "k": {"param": "PARAM_RKGRAPH_K", "default": 20, "type": int},
+        "t": {"param": "PARAM_RKGRAPH_T", "default": 1, "type": int},
+        "p": {"param": "PARAM_RKGRAPH_P", "default": 0.95, "type": float},
+        "l": {"param": "PARAM_RKGRAPH_L", "default": 700, "type": int},
+    },
+    "RECKNNGRAPH": {
+        "l": {"param": "PARAM_RECKNNGRAPH_L", "default": 200, "type": int},
+        "k": {"param": "PARAM_RECKNNGRAPH_K", "default": 15, "type": int},
+        "epsilon": {"param": "PARAM_RECKNNGRAPH_EPSILON", "default": 0.0125, "type": float},
+    },
+    "RLRECOM": {
+        "l": {"param": "PARAM_RLRECOM_L", "default": 400, "type": int},
+        "k": {"param": "PARAM_RLRECOM_K", "default": 8, "type": int},
+        "lambda": {"param": "PARAM_RLRECOM_LAMBDA", "default": 2.0, "type": float},
+        "epsilon": {"param": "PARAM_RLRECOM_EPSILON", "default": 0.0125, "type": float},
+    },
+    "RLSIM": {
+        "topk": {"param": "PARAM_RLSIM_TOPK", "default": 15, "type": int},
+        "ck": {"param": "PARAM_RLSIM_CK", "default": 700, "type": int},
+        "t": {"param": "PARAM_RLSIM_T", "default": 3, "type": int},
+        "metric": {"param": "PARAM_RLSIM_METRIC", "default": "INTERSECTION", "type": str},
+    },
+    "LHRR": {
+        "k": {"param": "PARAM_LHRR_K", "default": 18, "type": int},
+        "l": {"param": "PARAM_LHRR_L", "default": 1400, "type": int},
+        "t": {"param": "PARAM_LHRR_T", "default": 2, "type": int},
+    },
+    "BFSTREE": {
+        "l": {"param": "PARAM_BFSTREE_L", "default": 1400, "type": int},
+        "k": {"param": "PARAM_BFSTREE_K", "default": 20, "type": int},
+        "correlation_metric": {"param": "PARAM_BFSTREE_CORRELATION_METRIC", "default": "RBO", "type": str},
+    },
+    "RDPAC": {
+        "k_end": {"param": "PARAM_RDPAC_K_END", "default": 15, "type": int},
+        "k_inc": {"param": "PARAM_RDPAC_K_INC", "default": 1, "type": int},
+        "k_start": {"param": "PARAM_RDPAC_K_START", "default": 1, "type": int},
+        "l": {"param": "PARAM_RDPAC_L", "default": 400, "type": int},
+        "l_mult": {"param": "PARAM_RDPAC_L_MULT", "default": 2, "type": float},
+        "p": {"param": "PARAM_RDPAC_P", "default": 0.60, "type": float},
+        "pl": {"param": "PARAM_RDPAC_PL", "default": 0.99, "type": float},
+    },
+    "RFE": {
+        "k": {"param": "PARAM_RFE_K", "default": 20, "type": int},
+        "t": {"param": "PARAM_RFE_T", "default": 2, "type": int},
+        "l": {"param": "PARAM_RFE_L", "default": 400, "type": int},
+        "pa": {"param": "PARAM_RFE_PA", "default": 0.1, "type": float},
+        "th_cc": {"param": "PARAM_RFE_TH_CC", "default": 0, "type": float},
+        "rerank_by_emb": {"param": "PARAM_RFE_RERANK_BY_EMB", "default": False, "type": bool},
+        "export_embeddings": {"param": "PARAM_RFE_EXPORT_EMBEDDINGS", "default": False, "type": bool},
+        "perform_ccs": {"param": "PARAM_RFE_PERFORM_CCS", "default": True, "type": bool},
+        "embeddings_path": {"param": "PARAM_RFE_EMBEDDINGS_PATH", "default": "embeddings.txt", "type": str},
+        "ccs_path": {"param": "PARAM_RFE_CCS_PATH", "default": "ccs.txt", "type": str},
+    },
+}
+
+
+
+def matches_type(value, expected_type) -> bool:
+    """Type check for method parameters: an int is a valid float, and a bool
+    is never a number (in Python, bool is a subclass of int)."""
+    if expected_type is bool:
+        return isinstance(value, (bool, np.bool_))
+    if isinstance(value, (bool, np.bool_)):
+        return False
+    if expected_type is int:
+        return isinstance(value, (Integral, np.integer))
+    if expected_type is float:
+        return isinstance(value, (Integral, float, np.integer, np.floating))
+    return isinstance(value, expected_type)
+
+
+def validate_param(key: str, value):
+    """
+    Validate a parameter based on VALIDATIONS rules.
+    Returns the normalized value if valid.
+    Raises ValueError if invalid.
+    """
+    rules = VALIDATIONS.get(key)
+    if not rules:
+        return value  # no validation rules
+
+    t = rules["type"]
+
+    # ENUM
+    if t == "enum":
+        if isinstance(value, str):
+            val = value.strip().upper()
+            if val in rules["values"]:
+                return val
+        raise ValueError(f"Invalid value '{value}' for {key}. Allowed: {rules['values']}")
+
+    # BOOL
+    if t == "bool":
+        if isinstance(value, str):
+            val = value.strip().upper()
+            if val in {"TRUE", "FALSE"}:
+                return val
+        if isinstance(value, bool):
+            return "TRUE" if value else "FALSE"
+        raise ValueError(f"Invalid value '{value}' for {key}. Must be TRUE/FALSE.")
+
+    # UINT (int, numpy integer or a string of digits; bool is not a number here)
+    if t == "uint":
+        if isinstance(value, str) and value.strip().isdigit():
+            return int(value.strip())
+        if isinstance(value, (int, np.integer)) and not isinstance(value, bool) and value >= 0:
+            return int(value)
+        raise ValueError(f"Invalid value '{value}' for {key}. Must be unsigned integer.")
+
+    # FLOAT (any real number or numeric string; bool is not a number here)
+    if t == "float":
+        if isinstance(value, bool):
+            raise ValueError(f"Invalid value '{value}' for {key}. Must be float.")
+        try:
+            f = float(value)
+        except Exception:
+            raise ValueError(f"Invalid value '{value}' for {key}. Must be float.")
+        if "min" in rules and f < rules["min"]:
+            raise ValueError(f"{key} must be >= {rules['min']}")
+        if "max" in rules and f > rules["max"]:
+            raise ValueError(f"{key} must be <= {rules['max']}")
+        return f
+
+    # LIST_UINT (comma separated positive integers: UDLF aborts on P@0)
+    if t == "list_uint":
+        if isinstance(value, str):
+            parts = [x.strip() for x in value.split(",")]
+            if parts and all(x.isdigit() and int(x) > 0 for x in parts):
+                return [int(x) for x in parts]
+        if isinstance(value, (list, tuple)) and value:
+            if all(isinstance(x, (int, np.integer)) and not isinstance(x, bool) and x > 0
+                   for x in value):
+                return [int(x) for x in value]
+        raise ValueError(f"Invalid value '{value}' for {key}. "
+                         "Must be a list of positive integers.")
+
+    return value
+
+
+def validate_path(value: str, must_exist: bool = False) -> str:
+    """
+    Validate a file or directory path.
+
+    Args:
+        value (str): the path to validate.
+        must_exist (bool): if True, check that the path exists.
+
+    Returns:
+        str: the validated path.
+
+    Raises:
+        ValueError: if path is invalid, contains characters UDLF cannot read
+                    in a config file, or does not exist when must_exist=True.
+    """
+    if isinstance(value, Path):
+        value = str(value)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("Path must be a non-empty string.")
+
+    # Normalize
+    path_str = value.strip()
+    path = Path(path_str)
+
+    # UDLF removes every space/tab of a config line and treats '#' as the
+    # start of a comment, so such paths would be read as a different path.
+    if any(ch.isspace() for ch in path_str) or "#" in path_str:
+        raise ValueError(
+            f"Invalid path '{path_str}'. UDLF cannot read paths containing spaces "
+            "or '#' from its config file. Rename the file/folder or use a link."
+        )
+
+    # Optional existence check
+    if must_exist and not path.exists():
+        raise ValueError(f"Path does not exist: {path_str}")
+
+    return path_str

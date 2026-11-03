@@ -1,86 +1,185 @@
-from turtle import shape
-from pyUDLF.utils import readData
-from PIL import Image, ImageDraw
-import numpy as np
 import os
+from pathlib import Path
+from typing import Optional, List, Union
 
-# ler no config o metodo numerico ou str do rk
+import numpy as np
 
+from pyUDLF.utils.visualization import render_ranked_list
+
+
+from pyUDLF.utils import readData
+from pyUDLF.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 class OutputType:
     """
-    Class to handle the outputs
+    Handle outputs produced by UDLF (matrix, ranked lists, logs, visualizations).
     """
 
-    def __init__(self, nome=None):
+    def __init__(self, path: Optional[str] = None) -> None:
         """
-        Initial class parameters.
+        Initialize OutputType with optional base path.
+        
+        Args:
+            path (str, optional): Base path for outputs (rk, matrix, log, etc.).
         """
-        # dictionary with log data
-        self.log_dict = dict()
-        self.rk_path = nome
-        self.matrix_path = nome
-        self.log_path = nome
-        self.individual_gain_list = []
-        self.images_path = nome
-        self.list_path = nome
-        self.classes_path = nome
+        self.log_dict: dict = {}
+        self.rk_path: Optional[str] = path
+        self.matrix_path: Optional[str] = path
+        self.log_path: Optional[str] = path
+        self.individual_gain_list: list = []
+        self.images_path: Optional[str] = path
+        self.list_path: Optional[str] = path
+        self.classes_path: Optional[str] = path
+        self.stdout: str = ""  # everything UDLF printed during the run
 
-    def get_matrix(self):
+        logger.debug("OutputType initialized with base path: %r", path)
+
+    def get_matrix(self) -> List[List[float]]:
         """
-        Read matrix file
+        Read the matrix output file and return it as a list of lists.
 
-        Parameters:
-            matrix_path -> matrix path
+        Returns:
+            List[List[float]]: matrix of floats.
 
-        Return:
-            returns a matrix
+        Raises:
+            FileNotFoundError: if matrix_path is not set or file does not exist.
+            ValueError: if the file contents cannot be parsed as floats.
         """
-        if self.matrix_path is None:
-            print("The shape of the output is not matrix!")
-            return None
+        if not self.matrix_path:
+            logger.error("Matrix path not set. The output is not a matrix.")
+            raise FileNotFoundError("Matrix path not set.")
 
-        matrix = readData.read_matrix_file(self.matrix_path)
-        return matrix
+        p = Path(self.matrix_path)
+        if not p.is_file():
+            logger.error("Matrix file not found: %s", self.matrix_path)
+            raise FileNotFoundError(f"Matrix file not found: {self.matrix_path}")
 
-    def get_rks(self, top_k=1000):
-        """
-        Read string ou numeric ranked list
-
-        Parameters:
-            rk_patk -> ranked list path
-
-        Return:
-            returns a ranked list with image numbers or names
-        """
-        if self.rk_path is None:
-            print("The shape of the output is not RK!")
-            return None
-
-        rks = readData.read_ranked_lists_file_string(self.rk_path, top_k=top_k)
         try:
-            rks = [[int(elem) for elem in rk] for rk in rks]
-        finally:
+            matrix = readData.read_matrix_file(self.matrix_path)
+            logger.debug(
+                "Matrix read from %s (shape: %dx%d)",
+                self.matrix_path,
+                len(matrix),
+                len(matrix[0]) if matrix else 0,
+            )
+            return matrix
+        except Exception as e:
+            logger.exception("Failed to read matrix file %s: %s", self.matrix_path, e)
+            raise ValueError(f"Failed to parse matrix file {self.matrix_path}: {e}")
+
+    def get_rks(
+        self, top_k: int = 1000, expect_numeric: Optional[bool] = None
+    ) -> List[List[Union[int, str]]]:
+        """
+        Read ranked lists (RK) from file.
+
+        Args:
+            top_k (int): Limit each ranked list to the top-k elements. Default=1000.
+            expect_numeric (Optional[bool]):
+                - True: force conversion to int (raise error if fails).
+                - False: keep strings.
+                - None: try to convert, fallback to strings.
+
+        Returns:
+            List[List[int]] if numeric, or List[List[str]] if string.
+
+        Raises:
+            FileNotFoundError: if rk_path is not set or file does not exist.
+            ValueError: if forced numeric conversion fails.
+        """
+        if not self.rk_path:
+            logger.error("RK path not set. The output is not RK.")
+            raise FileNotFoundError("RK path not set.")
+
+        p = Path(self.rk_path)
+        if not p.is_file():
+            logger.error("Ranked list file not found: %s", self.rk_path)
+            raise FileNotFoundError(f"Ranked list file not found: {self.rk_path}")
+
+        try:
+            rks = readData.read_ranked_lists_file_string(self.rk_path, top_k=top_k)
+        except Exception as e:
+            logger.exception("Failed to read ranked list file %s: %s", self.rk_path, e)
+            raise ValueError(f"Failed to read ranked list file {self.rk_path}: {e}")
+
+        # force numeric
+        if expect_numeric is True:
+            try:
+                return [[int(elem) for elem in rk] for rk in rks]
+            except Exception as e:
+                logger.exception("Forced numeric conversion failed: %s", e)
+                raise ValueError(
+                    f"Numeric conversion failed for ranked list file {self.rk_path}: {e}"
+                )
+
+        # force string
+        if expect_numeric is False:
             return rks
 
-    def get_log(self):
-        """
-        Returns the result of the execution !
-        """
-        if self.log_path is None:
-            print("Output was not requested at execution! Log does not exist!")
-            return None
+        # auto-detect (try convert, fallback)
+        try:
+            return [[int(elem) for elem in rk] for rk in rks]
+        except Exception:
+            logger.debug("Ranked lists contain non-numeric entries; returning as strings.")
+            return rks
 
-        #self.log_dict = readData.read_log(self.log_path)
-        # for param in self.log_dict:
-        #    print("{} = {}".format(param, self.log_dict[param])) return ou nao?
+
+    def get_log(self) -> dict:
+        """
+        Get the execution log dictionary.
+
+        Returns:
+            dict: execution log with metrics and parameters.
+
+        Raises:
+            FileNotFoundError: if log_path is not set or file does not exist.
+        """
+        if not self.log_path:
+            logger.error("Log path not set. Output was not requested at execution.")
+            raise FileNotFoundError("Log path not set. Output does not exist.")
+
+        p = Path(self.log_path)
+        if not p.is_file():
+            logger.error("Log file not found: %s", self.log_path)
+            raise FileNotFoundError(f"Log file not found: {self.log_path}")
+
+        if not self.log_dict:
+            try:
+                self.log_dict = readData.read_log(self.log_path)
+                logger.debug("Log loaded successfully from %s", self.log_path)
+            except Exception as e:
+                logger.exception("Failed to read log file %s: %s", self.log_path, e)
+                raise ValueError(f"Failed to read log file {self.log_path}: {e}")
 
         return self.log_dict
-        # original n tinha nada
 
-    def get_individual_gain_list(self):
-        # print(self.get_individual_gain_list)
-        return self.individual_gain_list
+    def get_individual_gain_list(self, sort: bool = False, reverse: bool = True) -> list[tuple[float, int]]:
+        """
+        Get the individual gain list.
+
+        Args:
+            sort (bool): if True, return the list sorted by gain values.
+            reverse (bool): if True, sort descending (highest gain first).
+
+        Returns:
+            list[tuple[float, int]]: list of (gain, index).
+        """
+        if not self.individual_gain_list:
+            logger.warning("individual_gain_list is empty. Returning [].")
+            return []
+        # compute_gain already returns (gain, index) pairs; plain gains are paired here
+        paired = [item if isinstance(item, tuple) else (item, idx)
+                  for idx, item in enumerate(self.individual_gain_list)]
+
+        # Optionally sort
+        if sort:
+            paired.sort(key=lambda x: x[0], reverse=reverse)
+
+        return paired
+
+
 
     def print_log(self, log_value=None):
         """
@@ -97,115 +196,202 @@ class OutputType:
             if isinstance(log_value, dict):
                 for param in log_value:
                     print("{:<10} = {}".format(param, log_value[param]))
+                    
+    def show_rk(self, line: int, rk_size: int = 10,
+                images_shape: tuple[int, int] = (0, 0), start_element: int = 0):
+        """
+        Show a ranked list as concatenated images.
 
-    def show_rk(self, line, rk_size=10, images_shape=(0, 0), start_element=0):
-        return self.__internal_rk_images_use__(line, rk_size, images_shape=images_shape, start_element=start_element)
+        Args:
+            line (int): line index in the ranked list file (query index).
+            rk_size (int): number of retrieved elements to show.
+            images_shape (tuple[int, int]): resize shape (w,h). If (0,0), use smallest image.
+            start_element (int): starting index offset for the ranked list.
 
-    def save_rk_img(self, line, rk_size=10, images_shape=(0, 0), img_path="", start_element=0):
-        if not isinstance(img_path, str):
-            print("ERROR! Path must be of type string")
-            return
+        Returns:
+            PIL.Image.Image: the combined image for visualization.
 
-        return self.__internal_rk_images_use__(line, rk_size, images_shape=images_shape, save=True, img_path=img_path, start_element=start_element)
+        Raises:
+            ValueError: if line is not a valid index.
+        """
+        if type(line) is not int or line < 0:
+            raise ValueError(f"line must be a non-negative integer, got {line!r}")#print(self.rk_path, self.list_path, self.classes_path, self.images_path)
+        return render_ranked_list(
+            self.rk_path, self.list_path, self.classes_path, self.images_path,
+            line=line, rk_size=rk_size, images_shape=images_shape,
+            save=False, start_element=start_element
+        )
 
-    def __internal_rk_images_use__(self, line, rk_size=10, images_shape=(0, 0), save=False, img_path="", start_element=0):
-        min_shape = (0, 0)
+    def save_rk_img(self, line: int, rk_size: int = 10,
+                    images_shape: tuple[int, int] = (0, 0),
+                    img_path: str = "", start_element: int = 0):
+        return render_ranked_list(
+            self.rk_path, self.list_path, self.classes_path, self.images_path,
+            line=line, rk_size=rk_size, images_shape=images_shape,
+            save=True, img_path=img_path, start_element=start_element
+        )
 
-        #################
-        if ((self.list_path is None) or (self.classes_path is None) or (self.images_path is None)):
-            print("Something is wrong. Unable to generate preview!")
-            return
-        ###############
-        classes_list = readData.read_classes(
-            self.list_path, self.classes_path)
-        # print(classes_list)
 
-        if self.images_path is None:
-            print("Unable to generate preview, image path is empty!")
-            return
+    # def show_rk(self, line: int, rk_size: int = 10,
+    #             images_shape: tuple[int, int] = (0, 0), start_element: int = 0):
+    #     """
+    #     Show a ranked list as concatenated images.
 
-        f = open(self.rk_path)
-        all_lines = f.readlines()
-        f.close()
+    #     Args:
+    #         line (int): line index in the ranked list file (query index).
+    #         rk_size (int): number of retrieved elements to show.
+    #         images_shape (tuple[int, int]): resize shape (w,h). If (0,0), use smallest image.
+    #         start_element (int): starting index offset for the ranked list.
 
-        f = open(self.list_path)
-        list_test = [x.replace('\n', '') for x in f.readlines()]
-        f.close()
-        # print(list_test)
+    #     Returns:
+    #         PIL.Image.Image: the combined image for visualization.
 
-        # rk line for show
-        only_one = all_lines[line].split()
-        # print(only_one)
-        # print(classes_list[int(only_one[1])])
-        # taking images class
-        images_class_list = []
-        images_show_list = []
+    #     Raises:
+    #         ValueError: if line is not a valid index.
+    #     """
+    #     if type(line) is not int or line < 0:
+    #         raise ValueError(f"line must be a non-negative integer, got {line!r}")
 
-        # taking first element
-        images_class_list.append(classes_list[int(only_one[0])])
-        # print(only_one[i])
-        images_show_list.append(
-            self.images_path + list_test[int(only_one[0])])
-        if not os.path.isfile(images_show_list[0]):
-            print("No such file or directory: "+images_show_list[0])
-            return
+    #     # Validate range inside _render_rk_images
+    #     return self._render_rk_images(
+    #         line, rk_size, images_shape=images_shape, save=False,
+    #         img_path="", start_element=start_element
+    #     )
 
-        for i in range(1, rk_size):
-            j = i
-            i += start_element
+    # def save_rk_img(self, line: int, rk_size: int = 10,
+    #                 images_shape: tuple[int, int] = (0, 0),
+    #                 img_path: str = "", start_element: int = 0):
+    #     """
+    #     Save a ranked list as concatenated images.
 
-            # taking images class
-            images_class_list.append(classes_list[int(only_one[i])])
-            # print(only_one[i])
-            images_show_list.append(
-                self.images_path + list_test[int(only_one[i])])
-            if not os.path.isfile(images_show_list[j]):
-                print("No such file or directory: "+images_show_list[j])
-                return
+    #     Args:
+    #         line (int): line index in the ranked list file (query index).
+    #         rk_size (int): number of retrieved elements to save.
+    #         images_shape (tuple[int, int]): resize shape (w,h). If (0,0), use smallest image.
+    #         img_path (str): path to save the output image.
+    #         start_element (int): starting index offset for the ranked list.
 
-        imgs = [Image.open(i).convert('RGB') for i in images_show_list]
-        # print(images_class_list)
-        ##########################
-        ImageDraw.Draw(imgs[0]).rectangle(
-            [(0, 0), (imgs[0].width, imgs[0].height)], outline="blue", width=10)
-        for i in range(1, len(imgs)):
-            img = imgs[i]
-            if images_class_list[0] != images_class_list[i]:
-                ImageDraw.Draw(img).rectangle(
-                    [(0, 0), (img.width, img.height)], outline="red", width=10)
-            else:
-                ImageDraw.Draw(img).rectangle(
-                    [(0, 0), (img.width, img.height)], outline="green", width=10)
-        # test = [ImageDraw.Draw(img).rectangle(
-        #    [(0, 0), (img.width, img.height)], outline="red", width=4) for img in imgs]
+    #     Returns:
+    #         Path: path to the saved image.
 
-        #########################
+    #     Raises:
+    #         ValueError: if line is not a valid index or img_path is invalid.
+    #     """
+    #     if not isinstance(line, int) or line < 0:
+    #         raise ValueError(f"line must be a non-negative integer, got {line!r}")
+    #     if not isinstance(img_path, str) or not img_path.strip():
+    #         raise ValueError("img_path must be a non-empty string.")
 
-        # pick the image which is the smallest, and resize the others to match it (can be arbitrary image shape here)
-        if all((
-                isinstance(images_shape, tuple),
-                len(images_shape) == 2,
-                isinstance(images_shape[0], int),
-                isinstance(images_shape[1], int))):
-            if (images_shape[0] == 0 and images_shape[1] == 0):
-                min_shape = sorted([(np.sum(i.size), i.size)
-                                    for i in imgs])[0][1]
-            else:
-                min_shape = images_shape
-        else:
-            print("Impossible to generate visualization.")
-            print("Image sizes must be a tuple of 2 elements of type integer.")
-            return
+    #     return self._render_rk_images(
+    #         line, rk_size, images_shape=images_shape,
+    #         save=True, img_path=img_path, start_element=start_element
+    #     )
 
-        imgs_comb = np.concatenate(
-            [np.array(x.resize(min_shape)) for x in imgs], axis=1)
+    # def _render_rk_images(self, line: int, rk_size: int = 10,
+    #                     images_shape: tuple[int, int] = (0, 0),
+    #                     save: bool = False, img_path: str = "",
+    #                     start_element: int = 0):
+    #     """
+    #     Internal method to render ranked list images.
 
-        # save that beautiful picture
-        imgs_comb = Image.fromarray(imgs_comb)
+    #     Adds blue border to query, green to correct matches,
+    #     and red to incorrect ones.
 
-        if save:
-            imgs_comb.save(img_path)
-            return
-        else:
-            imgs_comb.show()
-            return imgs_comb
+    #     Returns:
+    #         PIL.Image.Image or Path: combined image, or saved path.
+
+    #     Raises:
+    #         ValueError: if indices are invalid or ranked list is too short.
+    #         RuntimeError: if required paths are missing.
+    #     """
+    #     # --- Sanity check for paths ---
+    #     if not all((self.list_path, self.classes_path, self.images_path, self.rk_path)):
+    #         raise RuntimeError("Missing required paths. Cannot render ranked list.")
+
+    #     # --- Load classes ---
+    #     classes_list = readData.read_classes(self.list_path, self.classes_path)
+
+    #     # --- Load ranked lists (strings) ---
+    #     with open(self.rk_path, "r") as f:
+    #         all_lines = f.readlines()
+
+    #     if line >= len(all_lines):
+    #         raise ValueError(f"line index {line} out of range (max {len(all_lines)-1})")
+
+    #     only_one = all_lines[line].split()
+    #     if not only_one:
+    #         raise ValueError(f"Ranked list at line {line} is empty.")
+
+    #     # --- Load file list (image names) ---
+    #     with open(self.list_path, "r") as f:
+    #         list_test = [x.strip() for x in f.readlines()]
+
+    #     # --- Check rk_size validity ---
+    #     if rk_size + start_element > len(only_one):
+    #         raise ValueError(
+    #             f"Requested rk_size={rk_size} with start_element={start_element}, "
+    #             f"but only {len(only_one)} elements available in ranked list."
+    #         )
+
+    #     # --- Build image paths and corresponding classes ---
+    #     images_class_list = []
+    #     images_show_list = []
+
+    #     for i in range(rk_size):
+    #         idx = int(only_one[i + start_element])
+
+    #         if not (0 <= idx < len(classes_list)):
+    #             raise ValueError(f"Index {idx} out of range for classes_list (len={len(classes_list)}).")
+    #         if not (0 <= idx < len(list_test)):
+    #             raise ValueError(f"Index {idx} out of range for list_test (len={len(list_test)}).")
+
+    #         images_class_list.append(classes_list[idx])
+    #         images_show_list.append(str(Path(self.images_path) / list_test[idx]))
+
+    #     # --- Verify files exist ---
+    #     for p in images_show_list:
+    #         if not Path(p).is_file():
+    #             raise FileNotFoundError(f"No such file: {p}")
+
+    #     # --- Open all images ---
+    #     imgs = [Image.open(p).convert("RGB") for p in images_show_list]
+
+    #     # --- Draw borders ---
+    #     ImageDraw.Draw(imgs[0]).rectangle(
+    #         [(0, 0), (imgs[0].width, imgs[0].height)], outline="blue", width=10
+    #     )
+    #     for i in range(1, len(imgs)):
+    #         color = "green" if images_class_list[0] == images_class_list[i] else "red"
+    #         ImageDraw.Draw(imgs[i]).rectangle(
+    #             [(0, 0), (imgs[i].width, imgs[i].height)], outline=color, width=10
+    #         )
+
+    #     # --- Decide resize shape ---
+    #     if (
+    #         isinstance(images_shape, tuple)
+    #         and len(images_shape) == 2
+    #         and all(isinstance(x, int) for x in images_shape)
+    #     ):
+    #         if images_shape == (0, 0):
+    #             # safer resize: use min width and min height
+    #             min_w = min(img.width for img in imgs)
+    #             min_h = min(img.height for img in imgs)
+    #             min_shape = (min_w, min_h)
+    #         else:
+    #             min_shape = images_shape
+    #     else:
+    #         raise ValueError("images_shape must be (int, int), e.g., (128, 128).")
+
+    #     # --- Concatenate horizontally ---
+    #     imgs_comb = np.concatenate(
+    #         [np.array(img.resize(min_shape)) for img in imgs], axis=1
+    #     )
+    #     imgs_comb = Image.fromarray(imgs_comb)
+
+    #     # --- Return/save result ---
+    #     if save:
+    #         imgs_comb.save(img_path)
+    #         return Path(img_path)
+    #     else:
+    #         imgs_comb.show()
+    #         return imgs_comb

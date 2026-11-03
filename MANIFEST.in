@@ -1,0 +1,7 @@
+# Ship the full test suite (with the synthetic dataset) in the source
+# distribution, so a downloaded sdist can be tested on its own.
+graft tests
+include scripts/build_udlf.sh
+include CHANGELOG.md READMEpt.md
+graft examples
+global-exclude __pycache__ *.py[cod]

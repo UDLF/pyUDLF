@@ -94,6 +94,21 @@ def csr_bin():
 
 
 @pytest.fixture(scope="session")
+def sparse_dir():
+    """Directory with the Sparse UDLF binaries (udlf, udlf_strict): UDLF_SPARSE_BIN
+    (the directory or one of the binaries), or .udlf/Sparse_UDLF/bin (built by
+    scripts/build_sparse.sh). Tests that need it are skipped otherwise."""
+    env = os.environ.get("UDLF_SPARSE_BIN")
+    path = Path(env).expanduser() if env else REPO_ROOT / ".udlf" / "Sparse_UDLF" / "bin"
+    if path.is_file():
+        path = path.parent
+    if not all((path / name).is_file() for name in ("udlf", "udlf_strict")):
+        pytest.skip(f"Sparse UDLF binaries not found in {path}. Run scripts/build_sparse.sh "
+                    "or set UDLF_SPARSE_BIN.")
+    return path
+
+
+@pytest.fixture(scope="session")
 def udlf_template(udlf_bin):
     env = os.environ.get("UDLF_CONFIG")
     path = Path(env).expanduser() if env else udlf_bin.parent / "config.ini"

@@ -17,18 +17,22 @@ configuration (12 methods, all input/output formats, fusion), on a synthetic dat
 - The UDLF 1.70 reference `config.ini` is shipped with pyUDLF and is the default template of
   `InputType` (the defaults no longer depend on a downloaded file).
 - `pyUDLF.enable_logging(level)`.
-- UDLF-CSR backend: `UDLF(bin_path=..., backend="csr")` runs CPRR and LHRR of
-  [UDLF-CSR](https://github.com/andreTomi/UDLF-CSR) with `engine="dense" | "sparse" | "mkl" |
-  "blas" | "eigen"` and returns the same `Result`, with measures computed with the UDLF
-  definitions (UDLF-CSR's own in `raw_metrics`). `scripts/build_csr.sh` builds it (pinned to
-  commit `b391800`). The binary type is checked: a UDLF binary used as UDLF-CSR (or the
-  opposite) is reported.
+- Sparse UDLF backend: `UDLF(bin_path=..., backend="sparse")` runs CPRR, LHRR, RDPAC, RFE and
+  BFSTREE of [Sparse UDLF](https://github.com/andreTomi/Sparse_UDLF), sparse implementations for
+  large datasets, and returns the same `Result`, with measures computed with the UDLF
+  definitions (Sparse UDLF's own in `raw_metrics`). On the synthetic dataset its ranked lists
+  are byte-identical to UDLF 1.70. `bin_path` (or `UDLF_SPARSE_BIN`) is the directory of its two
+  binaries; each method runs in the one that supports it. Its extra parameters are `threads`
+  (LHRR) and `b`, `memory_budget_mb` (BFSTREE). `scripts/build_sparse.sh` builds it (pinned to
+  commit `de3c14c`). The binary type is checked: a UDLF binary used as Sparse UDLF (or the
+  opposite), or a binary of its predecessor UDLF-CSR, is reported. `backend="csr"` and
+  `UDLF_CSR_BIN` are aliases.
 - `UDLF(threads=...)` sets the number of threads of the binary (`OMP_NUM_THREADS`).
 - `Result.warnings`: problems found in the results.
 - In-memory ranked lists as numpy arrays in `InputType.set_input_files`.
 - `pyproject.toml` packaging and a test suite (`pytest`).
 - `examples/`: runnable scripts (quickstart, comparing methods, parameter search, input formats,
-  fusion, per-query analysis, your own data from the command line, UDLF-CSR engines, legacy API),
+  fusion, per-query analysis, your own data from the command line, Sparse UDLF, legacy API),
   all run by the tests.
 - Continuous integration (GitHub Actions): Linux with Python 3.9 to 3.13, the built package
   with the official UDLF release, Windows (official UDLF release) and macOS (UDLF built from
@@ -82,8 +86,6 @@ configuration (12 methods, all input/output formats, fusion), on a synthetic dat
   and `find_best_method_with_best_k` used a fixed ranked list size of 280.
 - Windows: the official archive (`.tar.gz`) was opened as a zip, so the download never worked;
   the binary is now run directly (not through `cmd /c`).
-- `UDLF(bin_path=..., backend="csr")` with a relative path failed: UDLF-CSR runs in the run
-  directory. The binary path is now made absolute.
 
 ### Removed
 - `setup.py`, `requirements.txt`, `install.sh` and the empty `PKG-INFO`.
@@ -92,23 +94,19 @@ configuration (12 methods, all input/output formats, fusion), on a synthetic dat
 - Defaults of `PARAM_NONE_L`, `PARAM_LHRR_L` and `PARAM_BFSTREE_L`: the `config.ini` inside the
   UDLF 1.70 release has 1000, the one in the UDLF repository (tag v1.70) has 1400. pyUDLF uses
   1400 (the repository value, also the previous `set_method_parameters()` default).
-- UDLF-CSR (commit `b391800`), to report upstream; pyUDLF detects or works around them:
-  - the `sparse` engines return ranked lists with repeated elements in the top L, which
-    inflates the measures (warning in `Result.warnings`). Cause: `updateRankedLists` in
-    `CprrSparse.hpp` and `LHRRSparse.hpp` (same pattern in `LHRRMKL.hpp` and `CprrEigen.hpp`)
-    rewrites only the first min(scored elements, L) positions; when a query has fewer scored
-    elements than L (those reachable from its k neighbors), the other positions keep the
-    previous ranking, which repeats elements already placed. It depends on L relative to k,
-    not on L relative to N (synthetic data, L = 100: k = 5 repeats in every list, k = 30 in
-    none);
-  - the `dense` engines are not deterministic with several threads (use `threads=1`), and
-    their results differ from UDLF's CPRR and LHRR (e.g. Flowers, CPRR MAP 0.6173 vs 0.6382);
-  - `VirtualArray::create` passes a dangling pointer as file name: intermittent "Failed to
-    open backing file" at startup (retried automatically);
-  - its memory-mapped files have fixed names in `/tmp/udlf_temp`, so simultaneous runs could
-    overwrite each other (from the code; not reproduced with small datasets);
-  - it always exits with code 0, reads classes by line order, and leaves variables missing
-    from the config uninitialized (pyUDLF writes them all).
+- Sparse UDLF (commit `de3c14c`), to report upstream; pyUDLF detects or works around them:
+  - RFE cannot run: `PARAM_RFE_PERFORM_CCS`, `PARAM_RFE_RERANK_BY_EMB` and
+    `PARAM_RFE_EXPORT_EMBEDDINGS` are read by `RFE.hpp` but commented out in `Validator.hpp`,
+    so the config parser drops them ("Missing method parameter"); the error explains it;
+  - RFE with connected components (`perform_ccs=True`, the UDLF default) is refused as work in
+    progress: pyUDLF runs RFE with `perform_ccs=False` and warns;
+  - the matrix output (`OUTPUT_FILE_FORMAT = MATRIX`) is all zeros, and the log then evaluates
+    the input as "after": `output="matrix"` is refused, `run_config` warns;
+  - the ranked lists are always also written to `output/reranked_lists.txt` in the working
+    directory (pyUDLF runs it in the run directory);
+  - building needs jemalloc (`scripts/build_sparse.sh` links the runtime library when the
+    development package is missing), and the `make test-*` targets need directories that are
+    not in the repository.
 
 ## 0.8
 

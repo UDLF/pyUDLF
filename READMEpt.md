@@ -37,8 +37,8 @@ contêm, sem rótulos.
 O pyUDLF executa esses métodos a partir do Python: você passa arrays numpy (ou arquivos) e recebe
 de volta as listas re-ranqueadas e as medidas de avaliação (MAP, Precision@k, Recall@k) como
 arrays numpy e números. Os arquivos de configuração, os arquivos de entrada e o binário do UDLF
-ficam por conta do pyUDLF. A mesma API também roda o [UDLF-CSR](#udlf-csr), que implementa CPRR e LHRR com motores esparsos
-para datasets grandes.
+ficam por conta do pyUDLF. A mesma API também roda o [Sparse UDLF](#sparse-udlf), que implementa CPRR, LHRR, RDPAC, RFE e BFSTREE
+com matrizes esparsas para datasets grandes.
 
 Métodos (UDLF 1.70), com os nomes e artigos listados pelo UDLF:
 
@@ -122,7 +122,7 @@ Scripts prontos para rodar em [examples/](examples/README.md), com o dataset sin
 | [fusion.py](examples/fusion.py) | fusão de dois descritores |
 | [per_query_analysis.py](examples/per_query_analysis.py) | consultas que melhoraram ou pioraram |
 | [your_own_data.py](examples/your_own_data.py) | linha de comando para os seus arquivos |
-| [csr_engines.py](examples/csr_engines.py) | UDLF comparado aos motores do UDLF-CSR |
+| [sparse_methods.py](examples/sparse_methods.py) | UDLF comparado ao Sparse UDLF, método a método |
 | [legacy_api.py](examples/legacy_api.py) | a API das versões anteriores |
 
 
@@ -200,35 +200,30 @@ res = udlf.fuse("CPRR", [ranked_lists, ranked_lists_cosine], params={"l": 100}, 
 res.map_after             # FUSION results only have metrics after fusion
 ```
 
-### UDLF-CSR
+### Sparse UDLF
 
-O [UDLF-CSR](https://github.com/andreTomi/UDLF-CSR) é uma reescrita do UDLF que roda CPRR e LHRR
-com vários motores (`dense`, `sparse`, `mkl`, `blas`, `eigen`) para escalar a datasets grandes.
-Ele não tem build oficial: compile-o (`scripts/build_csr.sh` compila os motores `dense` e
-`sparse`; `scripts/build_csr.sh --full` compila todos e precisa de Intel MKL, GraphBLAS e Eigen) e
-passe o caminho com `bin_path=` ou com a variável de ambiente `UDLF_CSR_BIN`.
+O [Sparse UDLF](https://github.com/andreTomi/Sparse_UDLF) implementa CPRR, LHRR, RDPAC, RFE e
+BFSTREE com matrizes esparsas, para datasets em que as matrizes densas N x N do UDLF não cabem na
+memória. Com a mesma entrada, devolve as mesmas listas ranqueadas que o UDLF. Ele não tem build
+oficial: `scripts/build_sparse.sh` compila os dois binários (`udlf` e `udlf_strict`; o pyUDLF
+escolhe o certo para cada método). Passe a pasta deles com `bin_path=` ou com a variável de
+ambiente `UDLF_SPARSE_BIN`.
 
 ```python
-csr = UDLF(backend="csr", threads=1)      # binary from UDLF_CSR_BIN
-res = csr.run("CPRR", ranked_lists=ranked_lists, params={"l": 100, "k": 10},
-              classes=labels, engine="sparse")
-print(res)   # Result(method='CPRR_SPARSE', ranked_lists=(200, 100), MAP 0.5471 -> 0.7633)
-res.warnings                              # problems found in the results (see below)
-res.raw_metrics                           # measures computed by UDLF-CSR itself
+sparse = UDLF(backend="sparse")           # binaries from UDLF_SPARSE_BIN
+res = sparse.run("CPRR", ranked_lists=ranked_lists, params={"l": 100, "k": 10},
+                 classes=labels)
+print(res)   # Result(method='CPRR_SPARSE', ranked_lists=(200, 100), MAP 0.5471 -> 0.7602)
+res.raw_metrics                           # measures written by Sparse UDLF itself
 ```
 
-O resultado é o mesmo `Result` do UDLF. As `metrics` são calculadas pelo pyUDLF com as definições
-do UDLF, então resultados do UDLF e do UDLF-CSR são diretamente comparáveis (o UDLF-CSR calcula o
-recall com média por consulta, não por classe). O UDLF-CSR só aceita listas ranqueadas com índices
-(sem matriz, nomes ou fusão); `output="matrix"` devolve a matriz de distância dele.
-Comportamentos do UDLF-CSR (commit `b391800`) tratados pelo pyUDLF:
-
-- os motores `sparse` devolvem listas com elementos repetidos, o que infla as medidas: isso é
-  informado em `res.warnings`;
-- os motores `dense` dão resultados ligeiramente diferentes a cada execução com várias threads:
-  use `threads=1` para resultados reproduzíveis;
-- um erro intermitente na inicialização ("Failed to open backing file") é repetido
-  automaticamente e informado em `res.warnings`.
+O resultado é o mesmo `Result` do UDLF, e as `metrics` são calculadas pelo pyUDLF com as definições
+do UDLF. Os métodos podem ter o nome do UDLF (`"BFSTREE"`) ou do Sparse UDLF (`"BFSTree"`,
+`"CPRR_SPARSE"`). O Sparse UDLF só aceita listas ranqueadas com índices (sem matriz, nomes ou
+fusão). Ele tem três parâmetros a mais: `threads` no LHRR (padrão: o `threads` do `UDLF()`), e `b`
+e `memory_budget_mb` no BFSTREE. Na versão fixada (commit `de3c14c`), o RFE não roda (o leitor
+do config descarta as opções dele), o RFE com `perform_ccs=True` não é suportado e a matriz de
+saída sai zerada, por isso `output="matrix"` é recusado.
 
 ### Erros
 

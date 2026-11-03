@@ -14,8 +14,8 @@ import pyUDLF
 
 REPO = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO / "examples"
-CSR_BIN = Path(os.environ.get("UDLF_CSR_BIN") or
-               REPO / ".udlf" / "UDLF-CSR" / "Source" / "bin" / "udlf")
+SPARSE_BIN = Path(os.environ.get("UDLF_SPARSE_BIN") or REPO / ".udlf" / "Sparse_UDLF" / "bin")
+SPARSE_BUILT = (SPARSE_BIN / "udlf_strict").is_file() or SPARSE_BIN.is_file()
 
 # script -> text its output must contain
 EXPECTED = {
@@ -26,7 +26,7 @@ EXPECTED = {
     "fusion.py": "Fused (CPRR): MAP",
     "per_query_analysis.py": "queries improved",
     "your_own_data.py": "MAP 0.5471 -> 0.7602",
-    "csr_engines.py": "CSR sparse",
+    "sparse_methods.py": "RDPAC     0.5471 -> 0.8172   0.5471 -> 0.8172   yes",
     "legacy_api.py": "Queries with the largest gain",
 }
 
@@ -34,8 +34,8 @@ EXPECTED = {
 def run_example(script, tmp_path, udlf_bin, *args):
     env = dict(os.environ, UDLF_BIN=str(udlf_bin), TMPDIR=str(tmp_path), TEMP=str(tmp_path),
                PYTHONPATH=str(Path(pyUDLF.__file__).resolve().parent.parent))
-    if CSR_BIN.is_file():
-        env["UDLF_CSR_BIN"] = str(CSR_BIN)
+    if SPARSE_BUILT:
+        env["UDLF_SPARSE_BIN"] = str(SPARSE_BIN)
     return subprocess.run([sys.executable, str(EXAMPLES / script), *args], capture_output=True,
                           text=True, cwd=tmp_path, env=env, timeout=600)
 
@@ -46,8 +46,8 @@ def test_every_example_is_tested():
 
 @pytest.mark.parametrize("script", sorted(EXPECTED))
 def test_example_runs(script, tmp_path, udlf_bin):
-    if script == "csr_engines.py" and not CSR_BIN.is_file():
-        pytest.skip("UDLF-CSR is not built (scripts/build_csr.sh)")
+    if script == "sparse_methods.py" and not SPARSE_BUILT:
+        pytest.skip("Sparse UDLF is not built (scripts/build_sparse.sh)")
     proc = run_example(script, tmp_path, udlf_bin)
 
     assert proc.returncode == 0, proc.stderr

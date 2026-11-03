@@ -12,7 +12,7 @@ Warnings and errors are logged with the standard logging module; call
 pyUDLF.enable_logging("INFO") to also see informative messages.
 """
 
-__version__ = "0.9.0.dev0"
+__version__ = "0.9.0"
 
 from pyUDLF.api import UDLF, Result
 from pyUDLF.errors import UDLFError, UDLFNotFoundError, UDLFParamError, UDLFRunError

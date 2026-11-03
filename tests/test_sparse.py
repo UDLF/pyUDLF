@@ -9,6 +9,7 @@ otherwise these tests are skipped.
 
 import os
 import random
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -261,6 +262,7 @@ def test_backend_mismatch_is_detected(sparse_dir, udlf_bin):
         UDLF(bin_path=str(udlf_bin), backend="gpu")
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="the fake binary is a shell script")
 def test_former_udlf_csr_is_rejected(tmp_path):
     """UDLF-CSR answered a missing config like Sparse UDLF, but exited with 0."""
     fake = tmp_path / "udlf"

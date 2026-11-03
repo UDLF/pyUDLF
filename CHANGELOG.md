@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.9.0 (unreleased)
+## 0.9.0 (2026-11-03)
 
 Targets UDLF 1.70. Every pyUDLF run is tested against UDLF executed directly on the same
 configuration (12 methods, all input/output formats, fusion), on a synthetic dataset shipped in
@@ -92,11 +92,13 @@ configuration (12 methods, all input/output formats, fusion), on a synthetic dat
 ### Removed
 - `setup.py`, `requirements.txt`, `install.sh` and the empty `PKG-INFO`.
 
-### Open questions
+### Notes
 - Defaults of `PARAM_NONE_L`, `PARAM_LHRR_L` and `PARAM_BFSTREE_L`: the `config.ini` inside the
   UDLF 1.70 release has 1000, the one in the UDLF repository (tag v1.70) has 1400. pyUDLF uses
   1400 (the repository value, also the previous `set_method_parameters()` default).
-- Sparse UDLF (commit `de3c14c`), to report upstream; pyUDLF detects or works around them:
+
+### Known issues
+- Sparse UDLF (commit `de3c14c`), reported upstream; pyUDLF detects or works around them:
   - RFE cannot run: `PARAM_RFE_PERFORM_CCS`, `PARAM_RFE_RERANK_BY_EMB` and
     `PARAM_RFE_EXPORT_EMBEDDINGS` are read by `RFE.hpp` but commented out in `Validator.hpp`,
     so the config parser drops them ("Missing method parameter"); the error explains it;
